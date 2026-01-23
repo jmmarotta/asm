@@ -1,0 +1,4 @@
+- Add `asm doctor`
+- Add `asm debug paths`
+- Comprehensively test every command to ensure it works as expected
+- Add lefthook
