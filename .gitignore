@@ -1,0 +1,14 @@
+/asm
+/coverage.out
+*.test
+*.out
+
+.asm/
+
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
+
+dist/
