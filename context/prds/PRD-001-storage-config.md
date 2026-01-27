@@ -168,3 +168,17 @@ None.
 
 **Verification**
 - N/A (documentation cleanup only).
+
+### 2026-01-27
+**Decisions**
+- Repo-local only: manifest is `skills.jsonc` (+ `skills.sum`) in repo root.
+- Store/cache live under `.asm/`, installs land in `./skills`.
+- Store identity derives from `origin` (no ref/scoped variants).
+- Dropped viper; no env-config layer is used.
+
+**Changes**
+- Replaced global/local config layout with repo-local manifest layout.
+- Introduced `internal/asm`, `internal/manifest`, `internal/gitstore`, `internal/linker` boundaries.
+
+**Verification**
+- `go test ./...`

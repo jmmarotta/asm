@@ -1,20 +1,20 @@
 # AGENTS.md
 
 ## Overview
-- Repo is a Go CLI (`asm`) for managing skill sources and sync targets.
+- Repo is a Go CLI (`asm`) for managing repo-local skill sources and installs.
 - Module name: `github.com/jmmarotta/agent_skills_manager` (Go `1.24.9`).
 - CLI commands live under `internal/cli`, entrypoint in `cmd/asm`.
-- Config and storage live under `~/.config/asm`, `~/.local/share/asm`, `~/.cache/asm`.
+- Manifest lives at `skills.jsonc` (+ `skills.sum`), store/cache under `.asm/`, install under `./skills`.
 - Project planning docs live in `context/` (PRDs are append-only in Implementation Notes).
 
 ## Repo layout (high level)
 - `cmd/asm/` — CLI entrypoint (`main.go`).
-- `internal/cli/` — Cobra commands and flag parsing.
-- `internal/config/` — config structs, IO, validation, merge helpers.
+- `internal/cli/` — Cobra commands and flag parsing (prints reports).
+- `internal/asm/` — use-case layer (init/add/update/remove/install/list/show).
+- `internal/manifest/` — manifest + sum IO, validation, repo layout paths.
 - `internal/source/` — source parsing, GitHub tree URLs, discovery.
-- `internal/remote/` — go-git clone/ref helpers.
-- `internal/store/` — store key/path helpers for git sources.
-- `internal/syncer/` — pure sync/cleanup logic (symlink handling).
+- `internal/gitstore/` — go-git clone/ref/lockfile resolution, store key/path helpers.
+- `internal/linker/` — symlink link + prune logic.
 - `context/` — PRDs, project docs, outstanding items.
 
 ## Build / lint / test commands
@@ -33,7 +33,7 @@
 
 ### Test (single package)
 - `go test ./internal/cli -run TestName -count=1`
-- `go test ./internal/syncer -run TestSyncCreatesSymlink -count=1`
+- `go test ./internal/linker -run TestSyncCreatesSymlink -count=1`
 
 ### Format / lint
 - `gofmt -w cmd internal`
@@ -63,12 +63,11 @@
 - Use `cmd.ErrOrStderr()` for warnings.
 - Avoid interactive prompts; keep commands scriptable.
 
-### Config conventions
-- Config file preferred: `config.jsonc`; fallback to `config.json`.
-- Use `config.Load` / `config.Save` for all config IO.
-- Normalize `$HOME/...` for `type:"path"` origins and `Target.Path` when saving.
-- Expand `$HOME` paths immediately after loading.
-- Validate configs via `Config.Validate()`; fail fast on missing fields.
+### Manifest conventions
+- Manifest file preferred: `skills.jsonc`; fallback to `skills.json`.
+- Use `manifest.Load` / `manifest.Save` / `manifest.LoadState` for IO.
+- `skills.sum` stores origin/version -> commit resolution.
+- Validate manifests via `Config.Validate()`; fail fast on missing fields.
 
 ### Source handling
 - Local sources use `type:"path"` and `ref:"worktree"`.
@@ -77,15 +76,15 @@
 - GitHub tree URLs should be parsed via `source.ParseGitHubTreeURL`.
 
 ### Store handling
-- Remote store identity is `origin + ref` (`store.RepoKey`).
-- Local sources do not use the store; sync reads from the working tree.
-- Store paths are created under scope-specific store roots.
+- Remote store identity is `origin` (`gitstore.RepoKey`).
+- Local sources do not use the store; installs read from the working tree.
+- Store paths live under `.asm/store`.
 
 ### Sync behavior
-- `syncer.Sync` handles symlink creation/replacement safely.
+- `linker.Sync` handles symlink creation/replacement safely.
 - Destinations are `<target>/<source.name>`; names may include `/`.
 - Never delete real files/dirs during sync; warn and skip instead.
-- Cleanup only removes expected symlinks for a removed target.
+- `linker.Prune` only removes expected symlinks for removed skills.
 
 ## Error handling
 - Prefer `return err` for propagation; wrap with `fmt.Errorf` for context.
@@ -97,7 +96,7 @@
 - Use `t.TempDir()` for filesystem fixtures.
 - Use `t.Setenv("HOME", tempDir)` to avoid touching real user config.
 - Use `setWorkingDir` helper for repo-local behavior in CLI tests.
-- Avoid `t.Parallel()` in CLI tests (global cobra/viper state).
+- Avoid `t.Parallel()` in CLI tests (global cobra state).
 - For go-git tests, create local repos with go-git (no network).
 
 ## Dependency guidelines

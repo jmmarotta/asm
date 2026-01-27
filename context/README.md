@@ -25,9 +25,18 @@ context/
 - **No separate updates folder**: progress is colocated inside PRDs.
 
 ## Notes
-- Remote store identity is derived from `origin + ref`; changing either creates a new store path unless explicitly migrated.
-- Local path sources use `ref: worktree` and sync directly from the filesystem (no store directory).
+- Remote store identity is derived from `origin`; changing origin creates a new store path.
+- Local path sources use `type:"path"` and install directly from the filesystem (no store directory).
+
+## Module map
+- `internal/cli` — Cobra commands and report formatting.
+- `internal/asm` — use-case orchestration; returns report structs.
+- `internal/manifest` — manifest + sum IO, validation, repo layout paths.
+- `internal/source` — input parsing, GitHub tree URLs, discovery.
+- `internal/gitstore` — go-git clone/ref/lockfile resolution, store paths.
+- `internal/linker` — symlink creation and pruning.
 
 ## Entry points
 - Start with PRDs in `context/prds/` for execution.
 - Use `context/specs/` for cross-cutting invariants and verification guidance.
+- Module responsibilities and invariants: `context/specs/module-boundaries.md`.

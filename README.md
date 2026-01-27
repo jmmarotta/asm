@@ -87,5 +87,3 @@ Use local paths or `replace` overrides for private repositories until auth suppo
 
 ## Development
 See `docs/development.md` for build/test commands and contributor notes.
-
-Project docs live in `context/`.
