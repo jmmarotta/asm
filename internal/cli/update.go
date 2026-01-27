@@ -2,91 +2,96 @@ package cli
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
+	"github.com/go-git/go-git/v5"
 	"github.com/spf13/cobra"
 
 	"github.com/jmmarotta/agent_skills_manager/internal/config"
+	"github.com/jmmarotta/agent_skills_manager/internal/debug"
 	"github.com/jmmarotta/agent_skills_manager/internal/remote"
 	"github.com/jmmarotta/agent_skills_manager/internal/store"
-)
-
-const (
-	updateLocalFlag  = "local"
-	updateGlobalFlag = "global"
+	"github.com/jmmarotta/agent_skills_manager/internal/version"
 )
 
 func newUpdateCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "update [name]",
-		Short: "Update configured sources",
+		Short: "Update skill revisions",
 		Args:  cobra.MaximumNArgs(1),
 		RunE:  runUpdate,
 	}
-
-	cmd.Flags().Bool(updateLocalFlag, false, "Update sources in local config")
-	cmd.Flags().Bool(updateGlobalFlag, false, "Update sources in global config")
 
 	return cmd
 }
 
 func runUpdate(cmd *cobra.Command, args []string) error {
-	configs, err := loadConfigSet()
+	state, err := loadManifest()
+	if err != nil {
+		return fmt.Errorf("load manifest: %w", err)
+	}
+	debug.Logf("update start args=%v", args)
+
+	if len(state.Config.Skills) == 0 {
+		fmt.Fprintln(cmd.OutOrStdout(), "No skills found.")
+		return nil
+	}
+
+	origins, err := resolveUpdateOrigins(state.Config, args)
 	if err != nil {
 		return err
 	}
 
-	localFlag, err := cmd.Flags().GetBool(updateLocalFlag)
-	if err != nil {
-		return err
-	}
-	globalFlag, err := cmd.Flags().GetBool(updateGlobalFlag)
-	if err != nil {
-		return err
+	if state.Sum == nil {
+		state.Sum = map[config.SumKey]string{}
 	}
 
-	scoped, err := selectMutatingConfig(configs, localFlag, globalFlag)
-	if err != nil {
-		return err
-	}
-
-	sources, err := resolveSourcesForUpdate(scoped.Config, args)
-	if err != nil {
-		return err
-	}
-
-	for _, source := range sources {
-		if source.Type == "git" {
-			repoPath := store.RepoPath(scoped.Paths.StoreDir, source.Origin, source.Ref)
-			if err := remote.EnsureRepo(repoPath, source.Origin, source.Ref); err != nil {
-				return err
-			}
-			continue
+	for origin, versionValue := range origins {
+		debug.Logf("update origin=%s version=%s", debug.SanitizeOrigin(origin), versionValue)
+		path := store.RepoPath(state.Paths.StoreDir, origin)
+		if err := remote.EnsureRepo(path, origin); err != nil {
+			return err
 		}
-
-		target := source.Origin
-		if source.Subdir != "" {
-			target = filepath.Join(target, source.Subdir)
+		repo, err := git.PlainOpen(path)
+		if err != nil {
+			return fmt.Errorf("open repo %s: %w", path, err)
 		}
-		if _, err := os.Stat(target); err != nil {
-			return fmt.Errorf("local path missing: %s", target)
+		rev, err := version.ResolveForVersion(repo, versionValue)
+		if err != nil {
+			return fmt.Errorf("resolve version %s: %w", versionValue, err)
 		}
+		state.Sum[config.SumKey{Origin: origin, Version: versionValue}] = rev
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), "Sync not implemented yet.")
+	if err := saveManifest(state); err != nil {
+		return fmt.Errorf("save manifest: %w", err)
+	}
+
+	if err := installSkills(cmd.OutOrStdout(), cmd.ErrOrStderr(), state); err != nil {
+		return fmt.Errorf("install skills: %w", err)
+	}
+
 	return nil
 }
 
-func resolveSourcesForUpdate(cfg config.Config, args []string) ([]config.Source, error) {
+func resolveUpdateOrigins(configValue config.Config, args []string) (map[string]string, error) {
+	origins := make(map[string]string)
 	if len(args) == 0 {
-		return cfg.Sources, nil
+		for _, skill := range configValue.Skills {
+			if skill.Type != "git" {
+				continue
+			}
+			origins[skill.Origin] = skill.Version
+		}
+		return origins, nil
 	}
 
-	source, found := config.FindSource(cfg.Sources, args[0])
+	skill, found := config.FindSkill(configValue.Skills, args[0])
 	if !found {
-		return nil, fmt.Errorf("source %q not found", args[0])
+		return nil, fmt.Errorf("skill %q not found", args[0])
 	}
-
-	return []config.Source{source}, nil
+	if skill.Type != "git" {
+		return nil, fmt.Errorf("skill %q is not a git source", args[0])
+	}
+	origins[skill.Origin] = skill.Version
+	return origins, nil
 }

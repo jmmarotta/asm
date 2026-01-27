@@ -10,75 +10,58 @@ import (
 	"github.com/jmmarotta/agent_skills_manager/internal/store"
 )
 
-const (
-	removeLocalFlag  = "local"
-	removeGlobalFlag = "global"
-)
-
 func newRemoveCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "remove <name>",
-		Short: "Remove a configured source",
+		Short: "Remove a skill",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runRemove,
 	}
-
-	cmd.Flags().Bool(removeLocalFlag, false, "Remove source from local config")
-	cmd.Flags().Bool(removeGlobalFlag, false, "Remove source from global config")
 
 	return cmd
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {
-	configs, err := loadConfigSet()
+	state, err := loadManifest()
 	if err != nil {
 		return err
 	}
 
-	localFlag, err := cmd.Flags().GetBool(removeLocalFlag)
-	if err != nil {
-		return err
-	}
-	globalFlag, err := cmd.Flags().GetBool(removeGlobalFlag)
-	if err != nil {
-		return err
-	}
-
-	scoped, err := selectMutatingConfig(configs, localFlag, globalFlag)
-	if err != nil {
-		return err
-	}
-
-	removed, ok := scoped.Config.RemoveSource(args[0])
+	removed, ok := state.Config.RemoveSkill(args[0])
 	if !ok {
-		return fmt.Errorf("source %q not found", args[0])
-	}
-
-	if err := config.Save(scoped.ConfigPath, scoped.Config); err != nil {
-		return err
+		return fmt.Errorf("skill %q not found", args[0])
 	}
 
 	if removed.Type == "git" {
-		repoPath := store.RepoPath(scoped.Paths.StoreDir, removed.Origin, removed.Ref)
-		if !repoKeyExists(scoped.Config, removed.Origin, removed.Ref) {
-			if err := os.RemoveAll(repoPath); err != nil {
+		if !originInUse(state.Config, removed.Origin) {
+			delete(state.Config.Replace, removed.Origin)
+			deleteSumForOrigin(state.Sum, removed.Origin)
+			if err := os.RemoveAll(store.RepoPath(state.Paths.StoreDir, removed.Origin)); err != nil {
 				return err
 			}
 		}
 	}
 
-	return nil
+	if err := saveManifest(state); err != nil {
+		return err
+	}
+
+	return installSkills(cmd.OutOrStdout(), cmd.ErrOrStderr(), state)
 }
 
-func repoKeyExists(cfg config.Config, origin string, ref string) bool {
-	key := store.RepoKey(origin, ref)
-	for _, source := range cfg.Sources {
-		if source.Type != "git" {
-			continue
-		}
-		if store.RepoKey(source.Origin, source.Ref) == key {
+func originInUse(configValue config.Config, origin string) bool {
+	for _, skill := range configValue.Skills {
+		if skill.Type == "git" && skill.Origin == origin {
 			return true
 		}
 	}
 	return false
+}
+
+func deleteSumForOrigin(sum map[config.SumKey]string, origin string) {
+	for key := range sum {
+		if key.Origin == origin {
+			delete(sum, key)
+		}
+	}
 }

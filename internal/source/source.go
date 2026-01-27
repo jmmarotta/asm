@@ -12,8 +12,6 @@ import (
 var scpPattern = regexp.MustCompile(`^[^@]+@[^:]+:`)
 var githubTreePattern = regexp.MustCompile(`^https?://github.com/[^/]+/[^/]+/tree/`)
 
-const WorktreeRef = "worktree"
-
 func IsRemoteOrigin(origin string) bool {
 	if strings.Contains(origin, "://") {
 		return true

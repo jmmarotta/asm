@@ -28,8 +28,11 @@ func TestParseInputLocalInfersRepoRoot(t *testing.T) {
 	if input.Subdir != "plugins/foo" {
 		t.Fatalf("expected subdir plugins/foo, got %q", input.Subdir)
 	}
-	if input.Ref != WorktreeRef {
-		t.Fatalf("expected ref %q, got %q", WorktreeRef, input.Ref)
+	if input.Ref != "" {
+		t.Fatalf("expected empty ref, got %q", input.Ref)
+	}
+	if input.RepoRoot != repo {
+		t.Fatalf("expected repo root %q, got %q", repo, input.RepoRoot)
 	}
 }
 

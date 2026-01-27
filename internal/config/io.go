@@ -1,54 +1,101 @@
 package config
 
 import (
+	"bufio"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/tidwall/jsonc"
 )
 
 const (
-	jsoncFilename = "config.jsonc"
-	jsonFilename  = "config.json"
+	jsoncFilename = "skills.jsonc"
+	jsonFilename  = "skills.json"
+	sumFilename   = "skills.sum"
 )
 
-func Load(configDir string) (Config, string, error) {
-	path, exists, err := resolveConfigPath(configDir)
-	if err != nil {
-		return Config{}, path, err
+var ErrManifestNotFound = errors.New("skills.jsonc not found")
+
+func FindManifestPath(start string) (string, error) {
+	if start == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", err
+		}
+		start = cwd
 	}
 
-	if !exists {
-		return Config{}, path, nil
+	current, err := filepath.Abs(start)
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		if path, exists, err := resolveManifestPath(current); err != nil {
+			return "", err
+		} else if exists {
+			return path, nil
+		}
+
+		parent := filepath.Dir(current)
+		if parent == current {
+			break
+		}
+		current = parent
+	}
+
+	return "", ErrManifestNotFound
+}
+
+func DefaultManifestPath(root string) string {
+	return filepath.Join(root, jsoncFilename)
+}
+
+func SumPath(root string) string {
+	return filepath.Join(root, sumFilename)
+}
+
+func Load(path string) (Config, error) {
+	if path == "" {
+		return Config{}, fmt.Errorf("manifest path is required")
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return Config{}, path, err
+		return Config{}, err
 	}
 
 	cleaned := jsonc.ToJSON(data)
 	var parsed Config
 	if err := json.Unmarshal(cleaned, &parsed); err != nil {
-		return Config{}, path, err
+		return Config{}, err
 	}
 
-	expanded, err := expandConfigOrigins(parsed)
+	root := filepath.Dir(path)
+	expanded, err := expandConfigPaths(parsed, root)
 	if err != nil {
-		return Config{}, path, err
+		return Config{}, err
 	}
 
 	if err := expanded.Validate(); err != nil {
-		return Config{}, path, err
+		return Config{}, err
 	}
 
-	return expanded, path, nil
+	return expanded, nil
 }
 
 func Save(path string, config Config) error {
-	normalized, err := normalizeConfigOrigins(config)
+	if path == "" {
+		return fmt.Errorf("manifest path is required")
+	}
+
+	root := filepath.Dir(path)
+	normalized, err := normalizeConfigPaths(config, root)
 	if err != nil {
 		return err
 	}
@@ -69,15 +116,85 @@ func Save(path string, config Config) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-func resolveConfigPath(configDir string) (string, bool, error) {
-	jsoncPath := filepath.Join(configDir, jsoncFilename)
+func LoadSum(path string) (map[SumKey]string, error) {
+	entries := make(map[SumKey]string)
+	if path == "" {
+		return entries, fmt.Errorf("sum path is required")
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return entries, nil
+		}
+		return nil, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) != 3 {
+			return nil, fmt.Errorf("invalid skills.sum entry: %q", line)
+		}
+		key := SumKey{Origin: fields[0], Version: fields[1]}
+		if existing, ok := entries[key]; ok && existing != fields[2] {
+			return nil, fmt.Errorf("skills.sum has conflicting entries for %s %s", key.Origin, key.Version)
+		}
+		entries[key] = fields[2]
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return entries, nil
+}
+
+func SaveSum(path string, entries map[SumKey]string) error {
+	if path == "" {
+		return fmt.Errorf("sum path is required")
+	}
+
+	keys := make([]SumKey, 0, len(entries))
+	for key := range entries {
+		keys = append(keys, key)
+	}
+
+	sort.Slice(keys, func(i, j int) bool {
+		left := keys[i]
+		right := keys[j]
+		if left.Origin != right.Origin {
+			return left.Origin < right.Origin
+		}
+		return left.Version < right.Version
+	})
+
+	builder := &strings.Builder{}
+	for _, key := range keys {
+		fmt.Fprintf(builder, "%s %s %s\n", key.Origin, key.Version, entries[key])
+	}
+
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(path, []byte(builder.String()), 0o644)
+}
+
+func resolveManifestPath(root string) (string, bool, error) {
+	jsoncPath := filepath.Join(root, jsoncFilename)
 	if exists, err := fileExists(jsoncPath); err != nil {
 		return jsoncPath, false, err
 	} else if exists {
 		return jsoncPath, true, nil
 	}
 
-	jsonPath := filepath.Join(configDir, jsonFilename)
+	jsonPath := filepath.Join(root, jsonFilename)
 	if exists, err := fileExists(jsonPath); err != nil {
 		return jsoncPath, false, err
 	} else if exists {
@@ -98,77 +215,65 @@ func fileExists(path string) (bool, error) {
 	return false, err
 }
 
-func expandConfigOrigins(config Config) (Config, error) {
+func expandConfigPaths(config Config, root string) (Config, error) {
 	expanded := Config{
-		Sources: make([]Source, len(config.Sources)),
-		Targets: make([]Target, len(config.Targets)),
+		Skills:  make([]Skill, len(config.Skills)),
+		Replace: make(map[string]string, len(config.Replace)),
 	}
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return Config{}, err
-	}
-
-	for index, source := range config.Sources {
-		if source.Type == "path" {
-			source.Origin = expandHomePath(source.Origin, home)
+	for index, skill := range config.Skills {
+		if skill.Type == "path" {
+			skill.Origin = expandRelativePath(skill.Origin, root)
 		}
-		expanded.Sources[index] = source
+		expanded.Skills[index] = skill
 	}
 
-	for index, target := range config.Targets {
-		target.Path = expandHomePath(target.Path, home)
-		expanded.Targets[index] = target
+	for origin, replace := range config.Replace {
+		expanded.Replace[origin] = expandRelativePath(replace, root)
 	}
 
 	return expanded, nil
 }
 
-func normalizeConfigOrigins(config Config) (Config, error) {
+func normalizeConfigPaths(config Config, root string) (Config, error) {
 	normalized := Config{
-		Sources: make([]Source, len(config.Sources)),
-		Targets: make([]Target, len(config.Targets)),
+		Skills:  make([]Skill, len(config.Skills)),
+		Replace: make(map[string]string, len(config.Replace)),
 	}
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return Config{}, err
-	}
-
-	for index, source := range config.Sources {
-		if source.Type == "path" {
-			source.Origin = collapseHomePath(source.Origin, home)
+	for index, skill := range config.Skills {
+		if skill.Type == "path" {
+			skill.Origin = collapseRelativePath(skill.Origin, root)
 		}
-		normalized.Sources[index] = source
+		normalized.Skills[index] = skill
 	}
 
-	for index, target := range config.Targets {
-		target.Path = collapseHomePath(target.Path, home)
-		normalized.Targets[index] = target
+	for origin, replace := range config.Replace {
+		normalized.Replace[origin] = collapseRelativePath(replace, root)
 	}
 
 	return normalized, nil
 }
 
-func expandHomePath(value string, home string) string {
-	if value == "$HOME" {
-		return home
+func expandRelativePath(value string, root string) string {
+	if value == "" {
+		return ""
 	}
-	if strings.HasPrefix(value, "$HOME/") {
-		return filepath.Join(home, strings.TrimPrefix(value, "$HOME/"))
+	if filepath.IsAbs(value) {
+		return filepath.Clean(value)
 	}
-	return value
+	return filepath.Clean(filepath.Join(root, filepath.FromSlash(value)))
 }
 
-func collapseHomePath(value string, home string) string {
-	value = filepath.Clean(value)
-	home = filepath.Clean(home)
-	if value == home {
-		return "$HOME"
+func collapseRelativePath(value string, root string) string {
+	if value == "" {
+		return ""
 	}
-	prefix := home + string(filepath.Separator)
-	if strings.HasPrefix(value, prefix) {
-		return filepath.Join("$HOME", strings.TrimPrefix(value, prefix))
+	value = filepath.Clean(value)
+	root = filepath.Clean(root)
+	relative, err := filepath.Rel(root, value)
+	if err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return filepath.ToSlash(relative)
 	}
 	return value
 }

@@ -7,59 +7,81 @@ import (
 	"testing"
 
 	"github.com/jmmarotta/agent_skills_manager/internal/config"
-	"github.com/jmmarotta/agent_skills_manager/internal/scope"
 )
 
-func TestListAndShowScopePrecedence(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-
-	repo := filepath.Join(home, "repo")
-	initRepo(t, repo)
+func TestLsAndShow(t *testing.T) {
+	repo := t.TempDir()
 	setWorkingDir(t, repo)
 
-	globalConfigDir := filepath.Join(home, ".config", "asm")
-	saveConfig(t, globalConfigDir, config.Config{
-		Sources: []config.Source{{Name: "foo", Type: "path", Origin: "/global"}},
-	})
+	skillDir := filepath.Join(t.TempDir(), "foo")
+	if err := config.Save(filepath.Join(repo, "skills.jsonc"), config.Config{
+		Skills: []config.Skill{{
+			Name:   "foo",
+			Type:   "path",
+			Origin: skillDir,
+		}},
+	}); err != nil {
+		t.Fatalf("save manifest: %v", err)
+	}
 
-	localConfigDir := filepath.Join(repo, ".asm")
-	saveConfig(t, localConfigDir, config.Config{
-		Sources: []config.Source{{Name: "foo", Type: "path", Origin: "/local"}},
-	})
-
-	cmd, buffer := newTestCommand()
-	cmd.SetArgs([]string{"list"})
+	cmd, stdout, _ := newTestCommand()
+	cmd.SetArgs([]string{"ls"})
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("list: %v", err)
+		t.Fatalf("ls: %v", err)
 	}
-	output := buffer.String()
-	if !strings.Contains(output, "local") {
-		t.Fatalf("expected local scope in list output")
+	if !strings.Contains(stdout.String(), "foo") {
+		t.Fatalf("expected ls output to contain skill name")
 	}
 
-	cmd, buffer = newTestCommand()
+	cmd, stdout, _ = newTestCommand()
 	cmd.SetArgs([]string{"show", "foo"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("show: %v", err)
 	}
-	var scoped config.ScopedSource
-	if err := json.Unmarshal(buffer.Bytes(), &scoped); err != nil {
+	var output struct {
+		config.Skill
+		Replace string `json:"replace"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if scoped.Scope != scope.ScopeLocal {
-		t.Fatalf("expected local scope, got %s", scoped.Scope)
+	if output.Name != "foo" {
+		t.Fatalf("expected foo, got %s", output.Name)
+	}
+}
+
+func TestDebugFlagWritesToStderr(t *testing.T) {
+	repo := t.TempDir()
+	setWorkingDir(t, repo)
+
+	skillDir := filepath.Join(t.TempDir(), "foo")
+	if err := config.Save(filepath.Join(repo, "skills.jsonc"), config.Config{
+		Skills: []config.Skill{{
+			Name:   "foo",
+			Type:   "path",
+			Origin: skillDir,
+		}},
+	}); err != nil {
+		t.Fatalf("save manifest: %v", err)
 	}
 
-	cmd, buffer = newTestCommand()
-	cmd.SetArgs([]string{"show", "foo", "--scope", "global"})
+	cmd, stdout, stderr := newTestCommand()
+	cmd.SetArgs([]string{"--debug", "show", "foo"})
 	if err := cmd.Execute(); err != nil {
-		t.Fatalf("show global: %v", err)
+		t.Fatalf("show debug: %v", err)
 	}
-	if err := json.Unmarshal(buffer.Bytes(), &scoped); err != nil {
-		t.Fatalf("unmarshal global: %v", err)
+	if !strings.Contains(stderr.String(), "debug:") {
+		t.Fatalf("expected debug logs on stderr")
 	}
-	if scoped.Scope != scope.ScopeGlobal {
-		t.Fatalf("expected global scope, got %s", scoped.Scope)
+
+	var output struct {
+		config.Skill
+		Replace string `json:"replace"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if output.Name != "foo" {
+		t.Fatalf("expected foo, got %s", output.Name)
 	}
 }

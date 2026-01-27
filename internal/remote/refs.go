@@ -1,9 +1,13 @@
 package remote
 
 import (
+	"fmt"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/storage/memory"
+
+	"github.com/jmmarotta/agent_skills_manager/internal/debug"
 )
 
 type RefIndex struct {
@@ -13,6 +17,7 @@ type RefIndex struct {
 }
 
 func ListRemoteRefs(origin string) (RefIndex, error) {
+	debug.Logf("list remote refs origin=%s", debug.SanitizeOrigin(origin))
 	remote := git.NewRemote(memory.NewStorage(), &config.RemoteConfig{
 		Name: "origin",
 		URLs: []string{origin},
@@ -20,7 +25,7 @@ func ListRemoteRefs(origin string) (RefIndex, error) {
 
 	refs, err := remote.List(&git.ListOptions{})
 	if err != nil {
-		return RefIndex{}, err
+		return RefIndex{}, fmt.Errorf("list remote refs for %s: %w", debug.SanitizeOrigin(origin), err)
 	}
 
 	index := RefIndex{

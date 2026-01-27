@@ -1,94 +1,103 @@
 package cli
 
 import (
-	"fmt"
+	"errors"
+	"os"
+	"path/filepath"
+
 	"github.com/jmmarotta/agent_skills_manager/internal/config"
+	"github.com/jmmarotta/agent_skills_manager/internal/debug"
 	"github.com/jmmarotta/agent_skills_manager/internal/paths"
-	"github.com/jmmarotta/agent_skills_manager/internal/scope"
 )
 
-type configSet struct {
-	Local            config.Config
-	Global           config.Config
-	LocalConfigPath  string
-	GlobalConfigPath string
-	InRepo           bool
-	RepoRoot         string
+type manifestState struct {
+	Root         string
+	ManifestPath string
+	SumPath      string
+	Paths        paths.Paths
+	Config       config.Config
+	Sum          map[config.SumKey]string
 }
 
-type scopedConfig struct {
-	Config     config.Config
-	ConfigPath string
-	Paths      paths.Paths
-	Scope      scope.Scope
-	RepoRoot   string
+func loadManifest() (manifestState, error) {
+	path, err := config.FindManifestPath("")
+	if err != nil {
+		return manifestState{}, err
+	}
+	debug.Logf("manifest path=%s", path)
+
+	return loadManifestAt(path)
 }
 
-func loadConfigSet() (configSet, error) {
-	repoRoot, inRepo, err := scope.FindRepoRoot("")
+func loadOrInitManifest() (manifestState, bool, error) {
+	path, err := config.FindManifestPath("")
+	if err == nil {
+		debug.Logf("manifest path=%s", path)
+		state, err := loadManifestAt(path)
+		return state, false, err
+	}
+	if !errors.Is(err, config.ErrManifestNotFound) {
+		return manifestState{}, false, err
+	}
+
+	root, err := os.Getwd()
 	if err != nil {
-		return configSet{}, err
+		return manifestState{}, false, err
 	}
 
-	globalPaths, err := paths.GlobalPaths()
+	manifestPath := config.DefaultManifestPath(root)
+	debug.Logf("manifest init path=%s", manifestPath)
+	return manifestState{
+		Root:         root,
+		ManifestPath: manifestPath,
+		SumPath:      config.SumPath(root),
+		Paths:        paths.RepoPaths(root),
+		Config: config.Config{
+			Replace: map[string]string{},
+		},
+		Sum: map[config.SumKey]string{},
+	}, true, nil
+}
+
+func loadManifestAt(path string) (manifestState, error) {
+	configValue, err := config.Load(path)
 	if err != nil {
-		return configSet{}, err
+		return manifestState{}, err
+	}
+	if configValue.Replace == nil {
+		configValue.Replace = map[string]string{}
 	}
 
-	globalConfig, globalPath, err := config.Load(globalPaths.ConfigDir)
+	root := filepath.Dir(path)
+	sumPath := config.SumPath(root)
+	entries, err := config.LoadSum(sumPath)
 	if err != nil {
-		return configSet{}, err
+		return manifestState{}, err
 	}
 
-	localConfig := config.Config{}
-	localPath := ""
-	if inRepo {
-		localPaths := paths.LocalPaths(repoRoot)
-		localConfig, localPath, err = config.Load(localPaths.ConfigDir)
-		if err != nil {
-			return configSet{}, err
-		}
-	}
-
-	return configSet{
-		Local:            localConfig,
-		Global:           globalConfig,
-		LocalConfigPath:  localPath,
-		GlobalConfigPath: globalPath,
-		InRepo:           inRepo,
-		RepoRoot:         repoRoot,
+	return manifestState{
+		Root:         root,
+		ManifestPath: path,
+		SumPath:      sumPath,
+		Paths:        paths.RepoPaths(root),
+		Config:       configValue,
+		Sum:          entries,
 	}, nil
 }
 
-func selectMutatingConfig(configs configSet, local bool, global bool) (scopedConfig, error) {
-	if local && global {
-		return scopedConfig{}, fmt.Errorf("use only one of --local or --global")
+func saveManifest(state manifestState) error {
+	if state.Config.Replace == nil {
+		state.Config.Replace = map[string]string{}
 	}
-
-	if local {
-		if !configs.InRepo {
-			return scopedConfig{}, fmt.Errorf("local scope requires a git repo")
+	if err := config.Save(state.ManifestPath, state.Config); err != nil {
+		return err
+	}
+	if len(state.Sum) == 0 {
+		if err := os.Remove(state.SumPath); err != nil && !os.IsNotExist(err) {
+			return err
 		}
-		localPaths := paths.LocalPaths(configs.RepoRoot)
-		return scopedConfig{
-			Config:     configs.Local,
-			ConfigPath: configs.LocalConfigPath,
-			Paths:      localPaths,
-			Scope:      scope.ScopeLocal,
-			RepoRoot:   configs.RepoRoot,
-		}, nil
+		return nil
 	}
 
-	globalPaths, err := paths.GlobalPaths()
-	if err != nil {
-		return scopedConfig{}, err
-	}
-
-	return scopedConfig{
-		Config:     configs.Global,
-		ConfigPath: configs.GlobalConfigPath,
-		Paths:      globalPaths,
-		Scope:      scope.ScopeGlobal,
-		RepoRoot:   configs.RepoRoot,
-	}, nil
+	return config.SaveSum(state.SumPath, state.Sum)
 }

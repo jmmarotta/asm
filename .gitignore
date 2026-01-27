@@ -4,6 +4,7 @@
 *.out
 
 .asm/
+skills/
 
 .DS_Store
 .vscode/

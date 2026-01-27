@@ -4,7 +4,7 @@ import "testing"
 
 func TestConfigValidateMissingFields(t *testing.T) {
 	config := Config{
-		Sources: []Source{{Name: "", Type: "git", Origin: "x"}},
+		Skills: []Skill{{Name: "", Type: "git", Origin: "x", Version: "v1.0.0"}},
 	}
 	if err := config.Validate(); err == nil {
 		t.Fatalf("expected validation error")
@@ -13,16 +13,16 @@ func TestConfigValidateMissingFields(t *testing.T) {
 
 func TestConfigUpsertAndRemove(t *testing.T) {
 	config := Config{}
-	config.UpsertSource(Source{Name: "one", Type: "git", Origin: "a"})
-	config.UpsertSource(Source{Name: "one", Type: "git", Origin: "b"})
-	if len(config.Sources) != 1 {
-		t.Fatalf("expected 1 source, got %d", len(config.Sources))
+	config.UpsertSkill(Skill{Name: "one", Type: "git", Origin: "a", Version: "v1.0.0"})
+	config.UpsertSkill(Skill{Name: "one", Type: "git", Origin: "b", Version: "v1.0.0"})
+	if len(config.Skills) != 1 {
+		t.Fatalf("expected 1 skill, got %d", len(config.Skills))
 	}
-	if config.Sources[0].Origin != "b" {
-		t.Fatalf("expected origin b, got %q", config.Sources[0].Origin)
+	if config.Skills[0].Origin != "b" {
+		t.Fatalf("expected origin b, got %q", config.Skills[0].Origin)
 	}
 
-	removed, ok := config.RemoveSource("one")
+	removed, ok := config.RemoveSkill("one")
 	if !ok {
 		t.Fatalf("expected remove to succeed")
 	}
@@ -31,22 +31,14 @@ func TestConfigUpsertAndRemove(t *testing.T) {
 	}
 }
 
-func TestTargetUpsertAndRemove(t *testing.T) {
-	config := Config{}
-	config.UpsertTarget(Target{Name: "main", Path: "/tmp"})
-	config.UpsertTarget(Target{Name: "main", Path: "/home"})
-	if len(config.Targets) != 1 {
-		t.Fatalf("expected 1 target, got %d", len(config.Targets))
+func TestConfigRejectsMultipleVersionsPerOrigin(t *testing.T) {
+	config := Config{
+		Skills: []Skill{
+			{Name: "one", Type: "git", Origin: "example", Version: "v1.0.0"},
+			{Name: "two", Type: "git", Origin: "example", Version: "v1.1.0"},
+		},
 	}
-	if config.Targets[0].Path != "/home" {
-		t.Fatalf("expected path /home, got %q", config.Targets[0].Path)
-	}
-
-	removed, ok := config.RemoveTarget("main")
-	if !ok {
-		t.Fatalf("expected remove to succeed")
-	}
-	if removed.Name != "main" {
-		t.Fatalf("expected removed name main, got %q", removed.Name)
+	if err := config.Validate(); err == nil {
+		t.Fatalf("expected version conflict error")
 	}
 }

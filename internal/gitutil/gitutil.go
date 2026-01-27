@@ -1,10 +1,13 @@
 package gitutil
 
 import (
+	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
+
+	"github.com/go-git/go-git/v5"
+
+	"github.com/jmmarotta/agent_skills_manager/internal/debug"
 )
 
 func FindRepoRoot(start string) (string, bool, error) {
@@ -35,12 +38,40 @@ func FindRepoRoot(start string) (string, bool, error) {
 }
 
 func HeadSHA(repoRoot string) (string, error) {
-	output, err := exec.Command("git", "-C", repoRoot, "rev-parse", "HEAD").Output()
+	repo, err := git.PlainOpen(repoRoot)
+	if err != nil {
+		return "", fmt.Errorf("open repo %s: %w", repoRoot, err)
+	}
+
+	head, err := repo.Head()
 	if err != nil {
 		return "", err
 	}
 
-	return strings.TrimSpace(string(output)), nil
+	return head.Hash().String(), nil
+}
+
+func OriginURL(repoRoot string) (string, bool, error) {
+	debug.Logf("read origin url repo=%s", repoRoot)
+	repo, err := git.PlainOpen(repoRoot)
+	if err != nil {
+		return "", false, fmt.Errorf("open repo %s: %w", repoRoot, err)
+	}
+
+	remote, err := repo.Remote("origin")
+	if err != nil {
+		if err == git.ErrRemoteNotFound {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("read origin remote: %w", err)
+	}
+
+	urls := remote.Config().URLs
+	if len(urls) == 0 {
+		return "", false, nil
+	}
+
+	return urls[0], true, nil
 }
 
 func isGitDir(dir string) bool {

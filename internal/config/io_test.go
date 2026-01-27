@@ -9,48 +9,44 @@ import (
 
 func TestLoadPrefersJSONC(t *testing.T) {
 	root := t.TempDir()
-	jsoncPath := filepath.Join(root, "config.jsonc")
-	jsonPath := filepath.Join(root, "config.json")
+	jsoncPath := filepath.Join(root, "skills.jsonc")
+	jsonPath := filepath.Join(root, "skills.json")
 
-	if err := os.WriteFile(jsonPath, []byte(`{"sources": [{"name": "json", "type": "git", "origin": "x"}], "targets": []}`), 0o644); err != nil {
+	if err := os.WriteFile(jsonPath, []byte(`{"skills": [{"name": "json", "type": "git", "origin": "x", "version": "v1.0.0"}]}`), 0o644); err != nil {
 		t.Fatalf("write json: %v", err)
 	}
 	if err := os.WriteFile(jsoncPath, []byte(`// comment
 {
-  "sources": [{"name": "jsonc", "type": "git", "origin": "y"}],
-  "targets": []
+  "skills": [{"name": "jsonc", "type": "git", "origin": "y", "version": "v1.0.0"}]
 }`), 0o644); err != nil {
 		t.Fatalf("write jsonc: %v", err)
 	}
 
-	loaded, _, err := Load(root)
+	path, err := FindManifestPath(root)
 	if err != nil {
-		t.Fatalf("Load: %v", err)
+		t.Fatalf("FindManifestPath: %v", err)
 	}
-	if len(loaded.Sources) != 1 || loaded.Sources[0].Name != "jsonc" {
-		t.Fatalf("expected jsonc config to load")
+	if path != jsoncPath {
+		t.Fatalf("expected jsonc path, got %s", path)
 	}
 }
 
-func TestSaveAndLoadHomeExpansion(t *testing.T) {
-	home := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(home, "projects"), 0o755); err != nil {
-		t.Fatalf("mkdir projects: %v", err)
+func TestSaveAndLoadRelativePaths(t *testing.T) {
+	root := t.TempDir()
+	local := filepath.Join(root, "local")
+	if err := os.MkdirAll(local, 0o755); err != nil {
+		t.Fatalf("mkdir local: %v", err)
 	}
-	t.Setenv("HOME", home)
-
-	configDir := t.TempDir()
-	configPath := filepath.Join(configDir, "config.jsonc")
+	configPath := filepath.Join(root, "skills.jsonc")
 	input := Config{
-		Sources: []Source{{
+		Skills: []Skill{{
 			Name:   "local",
 			Type:   "path",
-			Origin: filepath.Join(home, "projects"),
+			Origin: local,
 		}},
-		Targets: []Target{{
-			Name: "dotfiles",
-			Path: filepath.Join(home, "dots"),
-		}},
+		Replace: map[string]string{
+			"https://example.com/repo": local,
+		},
 	}
 
 	if err := Save(configPath, input); err != nil {
@@ -61,21 +57,21 @@ func TestSaveAndLoadHomeExpansion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read config: %v", err)
 	}
-	if !strings.Contains(string(data), "$HOME/projects") {
-		t.Fatalf("expected $HOME substitution")
+	if !strings.Contains(string(data), "\"origin\": \"local\"") {
+		t.Fatalf("expected relative origin, got %s", string(data))
 	}
-	if !strings.Contains(string(data), "$HOME/dots") {
-		t.Fatalf("expected $HOME substitution for target path")
+	if !strings.Contains(string(data), "\"https://example.com/repo\": \"local\"") {
+		t.Fatalf("expected relative replace path")
 	}
 
-	loaded, _, err := Load(configDir)
+	loaded, err := Load(configPath)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if loaded.Sources[0].Origin != filepath.Join(home, "projects") {
-		t.Fatalf("expected expanded origin, got %q", loaded.Sources[0].Origin)
+	if loaded.Skills[0].Origin != local {
+		t.Fatalf("expected expanded origin, got %q", loaded.Skills[0].Origin)
 	}
-	if loaded.Targets[0].Path != filepath.Join(home, "dots") {
-		t.Fatalf("expected expanded target path, got %q", loaded.Targets[0].Path)
+	if loaded.Replace["https://example.com/repo"] != local {
+		t.Fatalf("expected expanded replace path, got %q", loaded.Replace["https://example.com/repo"])
 	}
 }

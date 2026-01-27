@@ -7,6 +7,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/tidwall/jsonc v0.3.2
+	golang.org/x/mod v0.32.0
 )
 
 require (

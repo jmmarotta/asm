@@ -15,6 +15,7 @@ type Input struct {
 	Ref       string
 	Subdir    string
 	LocalPath string
+	RepoRoot  string
 	IsLocal   bool
 }
 
@@ -70,9 +71,10 @@ func parseLocalInput(input string, pathFlag string) (Input, error) {
 	return Input{
 		Type:      "path",
 		Origin:    origin,
-		Ref:       WorktreeRef,
+		Ref:       "",
 		Subdir:    subdir,
-		LocalPath: origin,
+		LocalPath: absolute,
+		RepoRoot:  repoRoot,
 		IsLocal:   true,
 	}, nil
 }

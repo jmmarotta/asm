@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
 )
 
 func TestEnsureRepoClonesAndUpdates(t *testing.T) {
@@ -23,17 +22,8 @@ func TestEnsureRepoClonesAndUpdates(t *testing.T) {
 	}
 	commit(t, repo, wt, "init")
 
-	if err := wt.Checkout(&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName("feature/foo"), Create: true}); err != nil {
-		t.Fatalf("checkout: %v", err)
-	}
-	writeFile(t, repoDir, "plugins/foo/SKILL.md", "branch")
-	if _, err := wt.Add("plugins/foo/SKILL.md"); err != nil {
-		t.Fatalf("add branch: %v", err)
-	}
-	commit(t, repo, wt, "branch")
-
 	cloneDir := filepath.Join(t.TempDir(), "clone")
-	if err := EnsureRepo(cloneDir, repoDir, "feature/foo"); err != nil {
+	if err := EnsureRepo(cloneDir, repoDir); err != nil {
 		t.Fatalf("EnsureRepo: %v", err)
 	}
 
@@ -41,28 +31,25 @@ func TestEnsureRepoClonesAndUpdates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read clone: %v", err)
 	}
-	if string(contents) != "branch" {
-		t.Fatalf("expected branch, got %q", string(contents))
+	if string(contents) != "v1" {
+		t.Fatalf("expected v1, got %q", string(contents))
 	}
 
-	if err := wt.Checkout(&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName("feature/foo")}); err != nil {
-		t.Fatalf("checkout branch: %v", err)
-	}
 	writeFile(t, repoDir, "plugins/foo/SKILL.md", "v2")
 	if _, err := wt.Add("plugins/foo/SKILL.md"); err != nil {
 		t.Fatalf("add update: %v", err)
 	}
-	commit(t, repo, wt, "update")
+	newCommit := commit(t, repo, wt, "update")
 
-	if err := EnsureRepo(cloneDir, repoDir, "feature/foo"); err != nil {
+	if err := EnsureRepo(cloneDir, repoDir); err != nil {
 		t.Fatalf("EnsureRepo update: %v", err)
 	}
 
-	updated, err := os.ReadFile(filepath.Join(cloneDir, "plugins", "foo", "SKILL.md"))
+	cloneRepo, err := git.PlainOpen(cloneDir)
 	if err != nil {
-		t.Fatalf("read clone update: %v", err)
+		t.Fatalf("open clone: %v", err)
 	}
-	if string(updated) != "v2" {
-		t.Fatalf("expected v2, got %q", string(updated))
+	if _, err := cloneRepo.CommitObject(newCommit); err != nil {
+		t.Fatalf("expected fetched commit: %v", err)
 	}
 }

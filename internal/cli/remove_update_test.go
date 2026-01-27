@@ -1,68 +1,67 @@
 package cli
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/jmmarotta/agent_skills_manager/internal/config"
 )
 
-func TestRemoveDefaultsToGlobal(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-
-	repo := filepath.Join(home, "repo")
-	initRepo(t, repo)
+func TestRemovePrunesSymlink(t *testing.T) {
+	repo := t.TempDir()
 	setWorkingDir(t, repo)
 
-	globalConfigDir := filepath.Join(home, ".config", "asm")
-	saveConfig(t, globalConfigDir, config.Config{
-		Sources: []config.Source{{Name: "foo", Type: "path", Origin: "/global"}},
-	})
+	skillRoot := filepath.Join(t.TempDir(), "foo")
+	touchSkill(t, skillRoot)
 
-	localConfigDir := filepath.Join(repo, ".asm")
-	saveConfig(t, localConfigDir, config.Config{
-		Sources: []config.Source{{Name: "foo", Type: "path", Origin: "/local"}},
-	})
+	if err := config.Save(filepath.Join(repo, "skills.jsonc"), config.Config{
+		Skills: []config.Skill{{
+			Name:   "foo",
+			Type:   "path",
+			Origin: skillRoot,
+		}},
+	}); err != nil {
+		t.Fatalf("save manifest: %v", err)
+	}
 
-	cmd, _ := newTestCommand()
+	skillsDir := filepath.Join(repo, "skills")
+	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
+		t.Fatalf("mkdir skills: %v", err)
+	}
+	linkPath := filepath.Join(skillsDir, "foo")
+	if err := os.Symlink(skillRoot, linkPath); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+
+	cmd, _, _ := newTestCommand()
 	cmd.SetArgs([]string{"remove", "foo"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("remove: %v", err)
 	}
 
-	globalLoaded, _, err := config.Load(globalConfigDir)
+	loaded, err := config.Load(filepath.Join(repo, "skills.jsonc"))
 	if err != nil {
-		t.Fatalf("load global: %v", err)
+		t.Fatalf("load manifest: %v", err)
 	}
-	if len(globalLoaded.Sources) != 0 {
-		t.Fatalf("expected global source removed")
+	if len(loaded.Skills) != 0 {
+		t.Fatalf("expected no skills, got %d", len(loaded.Skills))
 	}
-
-	localLoaded, _, err := config.Load(localConfigDir)
-	if err != nil {
-		t.Fatalf("load local: %v", err)
-	}
-	if len(localLoaded.Sources) != 1 {
-		t.Fatalf("expected local source to remain")
+	if _, err := os.Lstat(linkPath); !os.IsNotExist(err) {
+		t.Fatalf("expected symlink removed")
 	}
 }
 
-func TestUpdateLocalNoop(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-
-	repo := filepath.Join(home, "repo")
-	initRepo(t, repo)
+func TestUpdateNoSkillsNoop(t *testing.T) {
+	repo := t.TempDir()
 	setWorkingDir(t, repo)
 
-	localConfigDir := filepath.Join(repo, ".asm")
-	saveConfig(t, localConfigDir, config.Config{
-		Sources: []config.Source{{Name: "foo", Type: "path", Origin: repo}},
-	})
+	if err := config.Save(filepath.Join(repo, "skills.jsonc"), config.Config{}); err != nil {
+		t.Fatalf("save manifest: %v", err)
+	}
 
-	cmd, _ := newTestCommand()
-	cmd.SetArgs([]string{"update", "--local"})
+	cmd, _, _ := newTestCommand()
+	cmd.SetArgs([]string{"update"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("update: %v", err)
 	}

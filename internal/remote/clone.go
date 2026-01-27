@@ -4,16 +4,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing"
+
+	"github.com/jmmarotta/agent_skills_manager/internal/debug"
 )
 
-func EnsureRepo(path string, origin string, ref string) error {
+func EnsureRepo(path string, origin string) error {
 	if _, err := os.Stat(path); err == nil {
-		return UpdateRepo(path, origin, ref)
+		debug.Logf("update repo path=%s origin=%s", path, debug.SanitizeOrigin(origin))
+		return UpdateRepo(path, origin)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -21,34 +22,26 @@ func EnsureRepo(path string, origin string, ref string) error {
 	}
 
 	options := &git.CloneOptions{
-		URL:          origin,
-		Depth:        1,
-		SingleBranch: true,
-		Tags:         git.AllTags,
+		URL:   origin,
+		Tags:  git.AllTags,
+		Depth: 0,
 	}
 
-	reference, err := resolveReference(origin, ref)
-	if err != nil {
-		return err
-	}
-	if reference != "" {
-		options.ReferenceName = reference
+	debug.Logf("clone repo path=%s origin=%s", path, debug.SanitizeOrigin(origin))
+	if _, err := git.PlainClone(path, false, options); err != nil {
+		return fmt.Errorf("clone %s: %w", debug.SanitizeOrigin(origin), err)
 	}
 
-	repo, err := git.PlainClone(path, false, options)
-	if err != nil {
-		return err
-	}
-
-	return checkoutRef(repo, ref, reference)
+	return nil
 }
 
-func UpdateRepo(path string, origin string, ref string) error {
+func UpdateRepo(path string, origin string) error {
 	repo, err := git.PlainOpen(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("open repo %s: %w", path, err)
 	}
 
+	debug.Logf("fetch repo path=%s origin=%s", path, debug.SanitizeOrigin(origin))
 	fetchOptions := &git.FetchOptions{
 		RemoteName: "origin",
 		Tags:       git.AllTags,
@@ -59,76 +52,8 @@ func UpdateRepo(path string, origin string, ref string) error {
 	}
 
 	if err := repo.Fetch(fetchOptions); err != nil && err != git.NoErrAlreadyUpToDate {
-		return err
+		return fmt.Errorf("fetch %s: %w", debug.SanitizeOrigin(origin), err)
 	}
 
-	reference, err := resolveReference(origin, ref)
-	if err != nil {
-		return err
-	}
-	if reference.IsBranch() {
-		reference = plumbing.NewRemoteReferenceName("origin", reference.Short())
-	}
-
-	return checkoutRef(repo, ref, reference)
-}
-
-func checkoutRef(repo *git.Repository, ref string, reference plumbing.ReferenceName) error {
-	if ref == "" {
-		return nil
-	}
-
-	worktree, err := repo.Worktree()
-	if err != nil {
-		return err
-	}
-
-	options := &git.CheckoutOptions{Force: true}
-	if reference != "" {
-		options.Branch = reference
-		return worktree.Checkout(options)
-	}
-
-	if len(ref) == 40 && isHex(ref) {
-		options.Hash = plumbing.NewHash(ref)
-		return worktree.Checkout(options)
-	}
-
-	return fmt.Errorf("ref %q not found", ref)
-}
-
-func resolveReference(origin string, ref string) (plumbing.ReferenceName, error) {
-	if ref == "" {
-		return "", nil
-	}
-
-	refs, err := ListRemoteRefs(origin)
-	if err != nil {
-		return "", err
-	}
-
-	if strings.HasPrefix(ref, "refs/") {
-		return plumbing.ReferenceName(ref), nil
-	}
-	if strings.HasPrefix(ref, "tags/") {
-		return plumbing.NewTagReferenceName(strings.TrimPrefix(ref, "tags/")), nil
-	}
-
-	if _, ok := refs.Tags[ref]; ok {
-		return plumbing.NewTagReferenceName(ref), nil
-	}
-	if _, ok := refs.Branches[ref]; ok {
-		return plumbing.NewBranchReferenceName(ref), nil
-	}
-
-	return "", nil
-}
-
-func isHex(value string) bool {
-	for _, r := range value {
-		if (r < '0' || r > '9') && (r < 'a' || r > 'f') && (r < 'A' || r > 'F') {
-			return false
-		}
-	}
-	return true
+	return nil
 }

@@ -1,100 +1,100 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+
+	"golang.org/x/mod/module"
+	"golang.org/x/mod/semver"
+)
 
 type Config struct {
-	Sources []Source `json:"sources"`
-	Targets []Target `json:"targets"`
+	Skills  []Skill           `json:"skills"`
+	Replace map[string]string `json:"replace,omitempty"`
 }
 
-type Source struct {
-	Name   string `json:"name"`
-	Type   string `json:"type"`
-	Origin string `json:"origin"`
-	Subdir string `json:"subdir,omitempty"`
-	Ref    string `json:"ref,omitempty"`
+type Skill struct {
+	Name    string `json:"name"`
+	Type    string `json:"type"`
+	Origin  string `json:"origin"`
+	Subdir  string `json:"subdir,omitempty"`
+	Version string `json:"version,omitempty"`
 }
 
-type Target struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
+type SumKey struct {
+	Origin  string
+	Version string
 }
 
 func (config *Config) Validate() error {
-	for index, source := range config.Sources {
-		if err := source.Validate(index); err != nil {
+	versions := make(map[string]string)
+	for index, skill := range config.Skills {
+		if err := skill.Validate(index); err != nil {
 			return err
 		}
-	}
-
-	for index, target := range config.Targets {
-		if err := target.Validate(index); err != nil {
-			return err
+		if skill.Type != "git" {
+			continue
 		}
+		if existing, ok := versions[skill.Origin]; ok && existing != skill.Version {
+			return fmt.Errorf("skills[%d]: origin %q uses multiple versions", index, skill.Origin)
+		}
+		versions[skill.Origin] = skill.Version
 	}
 
 	return nil
 }
 
-func (config *Config) UpsertSource(source Source) {
-	for index, existing := range config.Sources {
-		if existing.Name == source.Name {
-			config.Sources[index] = source
+func (config *Config) UpsertSkill(skill Skill) {
+	for index, existing := range config.Skills {
+		if existing.Name == skill.Name {
+			config.Skills[index] = skill
 			return
 		}
 	}
-	config.Sources = append(config.Sources, source)
+	config.Skills = append(config.Skills, skill)
 }
 
-func (config *Config) RemoveSource(name string) (Source, bool) {
-	for index, source := range config.Sources {
-		if source.Name == name {
-			config.Sources = append(config.Sources[:index], config.Sources[index+1:]...)
-			return source, true
+func (config *Config) RemoveSkill(name string) (Skill, bool) {
+	for index, skill := range config.Skills {
+		if skill.Name == name {
+			config.Skills = append(config.Skills[:index], config.Skills[index+1:]...)
+			return skill, true
 		}
 	}
-	return Source{}, false
+	return Skill{}, false
 }
 
-func (config *Config) UpsertTarget(target Target) {
-	for index, existing := range config.Targets {
-		if existing.Name == target.Name {
-			config.Targets[index] = target
-			return
+func FindSkill(skills []Skill, name string) (Skill, bool) {
+	for _, skill := range skills {
+		if skill.Name == name {
+			return skill, true
 		}
 	}
-	config.Targets = append(config.Targets, target)
+	return Skill{}, false
 }
 
-func (config *Config) RemoveTarget(name string) (Target, bool) {
-	for index, target := range config.Targets {
-		if target.Name == name {
-			config.Targets = append(config.Targets[:index], config.Targets[index+1:]...)
-			return target, true
+func (skill Skill) Validate(index int) error {
+	if skill.Name == "" {
+		return fmt.Errorf("skills[%d]: missing name", index)
+	}
+	if skill.Type == "" {
+		return fmt.Errorf("skills[%d]: missing type", index)
+	}
+	if skill.Origin == "" {
+		return fmt.Errorf("skills[%d]: missing origin", index)
+	}
+	if skill.Type != "git" && skill.Type != "path" {
+		return fmt.Errorf("skills[%d]: invalid type %q", index, skill.Type)
+	}
+	if skill.Type == "git" && skill.Version == "" {
+		return fmt.Errorf("skills[%d]: missing version", index)
+	}
+	if skill.Type == "git" && skill.Version != "" {
+		if !semver.IsValid(skill.Version) && !module.IsPseudoVersion(skill.Version) {
+			return fmt.Errorf("skills[%d]: invalid version %q", index, skill.Version)
 		}
 	}
-	return Target{}, false
-}
-
-func (source Source) Validate(index int) error {
-	if source.Name == "" {
-		return fmt.Errorf("source[%d]: missing name", index)
-	}
-	if source.Type == "" {
-		return fmt.Errorf("source[%d]: missing type", index)
-	}
-	if source.Origin == "" {
-		return fmt.Errorf("source[%d]: missing origin", index)
-	}
-	return nil
-}
-
-func (target Target) Validate(index int) error {
-	if target.Name == "" {
-		return fmt.Errorf("target[%d]: missing name", index)
-	}
-	if target.Path == "" {
-		return fmt.Errorf("target[%d]: missing path", index)
+	if skill.Type == "path" && skill.Version != "" {
+		return fmt.Errorf("skills[%d]: path skills cannot set version", index)
 	}
 	return nil
 }

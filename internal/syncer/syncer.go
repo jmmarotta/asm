@@ -147,6 +147,10 @@ func safeNamePath(name string) (string, error) {
 	return filepath.Join(parts...), nil
 }
 
+func SafeNamePath(name string) (string, error) {
+	return safeNamePath(name)
+}
+
 func ensureDir(path string) error {
 	info, err := os.Stat(path)
 	if err == nil {
