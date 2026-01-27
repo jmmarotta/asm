@@ -1,13 +1,9 @@
 package cli
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
 
-	"github.com/jmmarotta/agent_skills_manager/internal/config"
-	"github.com/jmmarotta/agent_skills_manager/internal/store"
+	"github.com/jmmarotta/agent_skills_manager/internal/asm"
 )
 
 func newRemoveCommand() *cobra.Command {
@@ -22,46 +18,10 @@ func newRemoveCommand() *cobra.Command {
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {
-	state, err := loadManifest()
+	report, err := asm.Remove(args[0])
 	if err != nil {
 		return err
 	}
-
-	removed, ok := state.Config.RemoveSkill(args[0])
-	if !ok {
-		return fmt.Errorf("skill %q not found", args[0])
-	}
-
-	if removed.Type == "git" {
-		if !originInUse(state.Config, removed.Origin) {
-			delete(state.Config.Replace, removed.Origin)
-			deleteSumForOrigin(state.Sum, removed.Origin)
-			if err := os.RemoveAll(store.RepoPath(state.Paths.StoreDir, removed.Origin)); err != nil {
-				return err
-			}
-		}
-	}
-
-	if err := saveManifest(state); err != nil {
-		return err
-	}
-
-	return installSkills(cmd.OutOrStdout(), cmd.ErrOrStderr(), state)
-}
-
-func originInUse(configValue config.Config, origin string) bool {
-	for _, skill := range configValue.Skills {
-		if skill.Type == "git" && skill.Origin == origin {
-			return true
-		}
-	}
-	return false
-}
-
-func deleteSumForOrigin(sum map[config.SumKey]string, origin string) {
-	for key := range sum {
-		if key.Origin == origin {
-			delete(sum, key)
-		}
-	}
+	printRemoveReport(report, cmd.OutOrStdout(), cmd.ErrOrStderr())
+	return nil
 }

@@ -1,10 +1,9 @@
 package cli
 
 import (
-	"fmt"
-	"text/tabwriter"
-
 	"github.com/spf13/cobra"
+
+	"github.com/jmmarotta/agent_skills_manager/internal/asm"
 )
 
 func newLsCommand() *cobra.Command {
@@ -18,29 +17,9 @@ func newLsCommand() *cobra.Command {
 }
 
 func runLs(cmd *cobra.Command, _ []string) error {
-	state, err := loadManifest()
+	report, err := asm.List()
 	if err != nil {
 		return err
 	}
-
-	if len(state.Config.Skills) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No skills found.")
-		return nil
-	}
-
-	writer := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-	fmt.Fprintln(writer, "NAME\tTYPE\tORIGIN\tVERSION\tSUBDIR")
-	for _, skill := range state.Config.Skills {
-		fmt.Fprintf(
-			writer,
-			"%s\t%s\t%s\t%s\t%s\n",
-			skill.Name,
-			skill.Type,
-			skill.Origin,
-			skill.Version,
-			skill.Subdir,
-		)
-	}
-
-	return writer.Flush()
+	return printListReport(report, cmd.OutOrStdout())
 }

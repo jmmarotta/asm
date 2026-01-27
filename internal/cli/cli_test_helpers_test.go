@@ -7,13 +7,11 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
-	"github.com/jmmarotta/agent_skills_manager/internal/config"
+	"github.com/jmmarotta/agent_skills_manager/internal/manifest"
 )
 
 func newTestCommand() (*cobra.Command, *bytes.Buffer, *bytes.Buffer) {
-	viper.Reset()
 	cmd := newRootCommand()
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
@@ -50,9 +48,9 @@ func initRepo(t *testing.T, root string) {
 	}
 }
 
-func saveConfig(t *testing.T, dir string, cfg config.Config) {
+func saveConfig(t *testing.T, dir string, cfg manifest.Config) {
 	path := filepath.Join(dir, "skills.jsonc")
-	if err := config.Save(path, cfg); err != nil {
+	if err := manifest.Save(path, cfg); err != nil {
 		t.Fatalf("save config: %v", err)
 	}
 }

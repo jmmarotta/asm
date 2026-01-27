@@ -11,7 +11,7 @@ import (
 	gitconfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/jmmarotta/agent_skills_manager/internal/config"
+	"github.com/jmmarotta/agent_skills_manager/internal/manifest"
 )
 
 func TestAddLocalPathCreatesManifestAndSymlink(t *testing.T) {
@@ -27,7 +27,7 @@ func TestAddLocalPathCreatesManifestAndSymlink(t *testing.T) {
 		t.Fatalf("add: %v", err)
 	}
 
-	loaded, err := config.Load(filepath.Join(repo, "skills.jsonc"))
+	loaded, err := manifest.Load(filepath.Join(repo, "skills.jsonc"))
 	if err != nil {
 		t.Fatalf("load manifest: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestAddGitRepoReusesIdentityAndUpdatesVersion(t *testing.T) {
 		t.Fatalf("add: %v", err)
 	}
 
-	loaded, err := config.Load(filepath.Join(manifestRoot, "skills.jsonc"))
+	loaded, err := manifest.Load(filepath.Join(manifestRoot, "skills.jsonc"))
 	if err != nil {
 		t.Fatalf("load manifest: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestAddGitRepoReusesIdentityAndUpdatesVersion(t *testing.T) {
 		t.Fatalf("add again: %v", err)
 	}
 
-	loaded, err = config.Load(filepath.Join(manifestRoot, "skills.jsonc"))
+	loaded, err = manifest.Load(filepath.Join(manifestRoot, "skills.jsonc"))
 	if err != nil {
 		t.Fatalf("load manifest: %v", err)
 	}
@@ -168,7 +168,7 @@ func commitPaths(t *testing.T, repo *git.Repository, message string, when time.T
 	}
 }
 
-func assertNames(skills []config.Skill, names ...string) error {
+func assertNames(skills []manifest.Skill, names ...string) error {
 	set := make(map[string]struct{}, len(skills))
 	for _, skill := range skills {
 		set[skill.Name] = struct{}{}

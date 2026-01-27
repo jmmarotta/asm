@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/jmmarotta/agent_skills_manager/internal/gitutil"
 )
 
 type Input struct {
@@ -41,7 +39,7 @@ func parseLocalInput(input string, pathFlag string) (Input, error) {
 		return Input{}, err
 	}
 
-	repoRoot, inRepo, err := gitutil.FindRepoRoot(absolute)
+	repoRoot, inRepo, err := findRepoRoot(absolute)
 	if err != nil {
 		return Input{}, err
 	}

@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	"github.com/jmmarotta/agent_skills_manager/internal/gitutil"
 )
 
 var scpPattern = regexp.MustCompile(`^[^@]+@[^:]+:`)
@@ -50,7 +48,7 @@ func NormalizeOrigin(origin string) string {
 }
 
 func AuthorForLocalPath(path string) string {
-	repoRoot, inRepo, err := gitutil.FindRepoRoot(path)
+	repoRoot, inRepo, err := findRepoRoot(path)
 	if err == nil && inRepo {
 		return filepath.Base(repoRoot)
 	}

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 
 	"github.com/jmmarotta/agent_skills_manager/internal/debug"
 )
@@ -16,8 +15,6 @@ func Execute() error {
 }
 
 func newRootCommand() *cobra.Command {
-	cobra.OnInitialize(initConfig)
-
 	cmd := &cobra.Command{
 		Use:           "asm",
 		Short:         "ASM CLI",
@@ -47,11 +44,6 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newInitCommand())
 
 	return cmd
-}
-
-func initConfig() {
-	viper.SetEnvPrefix("ASM")
-	viper.AutomaticEnv()
 }
 
 func readBoolFlag(cmd *cobra.Command, name string) (bool, error) {

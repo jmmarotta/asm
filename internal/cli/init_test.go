@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jmmarotta/agent_skills_manager/internal/config"
+	"github.com/jmmarotta/agent_skills_manager/internal/manifest"
 )
 
 func TestInitCreatesManifestAndDirs(t *testing.T) {
@@ -74,7 +74,7 @@ func TestInitIdempotentGitignore(t *testing.T) {
 
 func TestInitRejectsParentManifest(t *testing.T) {
 	root := t.TempDir()
-	if err := config.Save(filepath.Join(root, "skills.jsonc"), config.Config{Skills: []config.Skill{}}); err != nil {
+	if err := manifest.Save(filepath.Join(root, "skills.jsonc"), manifest.Config{Skills: []manifest.Skill{}}); err != nil {
 		t.Fatalf("save manifest: %v", err)
 	}
 	child := filepath.Join(root, "child")

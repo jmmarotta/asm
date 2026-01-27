@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jmmarotta/agent_skills_manager/internal/config"
+	"github.com/jmmarotta/agent_skills_manager/internal/manifest"
 )
 
 func TestRemovePrunesSymlink(t *testing.T) {
@@ -15,8 +15,8 @@ func TestRemovePrunesSymlink(t *testing.T) {
 	skillRoot := filepath.Join(t.TempDir(), "foo")
 	touchSkill(t, skillRoot)
 
-	if err := config.Save(filepath.Join(repo, "skills.jsonc"), config.Config{
-		Skills: []config.Skill{{
+	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{
+		Skills: []manifest.Skill{{
 			Name:   "foo",
 			Type:   "path",
 			Origin: skillRoot,
@@ -40,7 +40,7 @@ func TestRemovePrunesSymlink(t *testing.T) {
 		t.Fatalf("remove: %v", err)
 	}
 
-	loaded, err := config.Load(filepath.Join(repo, "skills.jsonc"))
+	loaded, err := manifest.Load(filepath.Join(repo, "skills.jsonc"))
 	if err != nil {
 		t.Fatalf("load manifest: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestUpdateNoSkillsNoop(t *testing.T) {
 	repo := t.TempDir()
 	setWorkingDir(t, repo)
 
-	if err := config.Save(filepath.Join(repo, "skills.jsonc"), config.Config{}); err != nil {
+	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{}); err != nil {
 		t.Fatalf("save manifest: %v", err)
 	}
 

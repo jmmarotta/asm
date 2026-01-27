@@ -1,12 +1,9 @@
 package cli
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/spf13/cobra"
 
-	"github.com/jmmarotta/agent_skills_manager/internal/config"
+	"github.com/jmmarotta/agent_skills_manager/internal/asm"
 )
 
 func newShowCommand() *cobra.Command {
@@ -20,30 +17,9 @@ func newShowCommand() *cobra.Command {
 }
 
 func runShow(cmd *cobra.Command, args []string) error {
-	state, err := loadManifest()
+	report, err := asm.Show(args[0])
 	if err != nil {
 		return err
 	}
-
-	name := args[0]
-	skill, found := config.FindSkill(state.Config.Skills, name)
-	if !found {
-		return fmt.Errorf("skill %q not found", name)
-	}
-
-	output := struct {
-		config.Skill
-		Replace string `json:"replace,omitempty"`
-	}{
-		Skill:   skill,
-		Replace: state.Config.Replace[skill.Origin],
-	}
-
-	payload, err := json.MarshalIndent(output, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintln(cmd.OutOrStdout(), string(payload))
-	return nil
+	return printShowReport(report, cmd.OutOrStdout())
 }
