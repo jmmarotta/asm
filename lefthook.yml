@@ -1,0 +1,13 @@
+glob_matcher: doublestar
+
+pre-commit:
+  commands:
+    gofmt:
+      glob: "**/*.go"
+      run: gofmt -w {staged_files}
+      stage_fixed: true
+
+pre-push:
+  commands:
+    check:
+      run: make check

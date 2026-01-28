@@ -12,4 +12,7 @@ skills/
 *.swp
 *~
 
+lefthook-local.yml
+.lefthook-local.yml
+
 dist/

@@ -3,6 +3,28 @@
 ## Requirements
 - Go `1.24.9`
 - `make`
+- Lefthook (for Git hooks)
+
+### Lefthook setup
+Install Lefthook (choose one):
+```sh
+brew install lefthook
+```
+
+```sh
+go install github.com/evilmartians/lefthook/v2@latest
+```
+
+Enable hooks in this repo:
+```sh
+lefthook install
+```
+
+Hooks configured:
+- `pre-commit`: `gofmt` on staged Go files (auto-staged)
+- `pre-push`: `make check`
+
+Optional: create `lefthook-local.yml` to override hooks locally (gitignored).
 
 ## Build and test
 ```sh
