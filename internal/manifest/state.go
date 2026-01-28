@@ -11,10 +11,10 @@ import (
 type State struct {
 	Root         string
 	ManifestPath string
-	SumPath      string
+	LockPath     string
 	Paths        Paths
 	Config       Config
-	Sum          map[SumKey]string
+	Lock         map[LockKey]string
 }
 
 func LoadState() (State, error) {
@@ -48,12 +48,12 @@ func LoadOrInitState() (State, bool, error) {
 	return State{
 		Root:         root,
 		ManifestPath: manifestPath,
-		SumPath:      SumPath(root),
+		LockPath:     LockPath(root),
 		Paths:        RepoPaths(root),
 		Config: Config{
 			Replace: map[string]string{},
 		},
-		Sum: map[SumKey]string{},
+		Lock: map[LockKey]string{},
 	}, true, nil
 }
 
@@ -67,8 +67,8 @@ func LoadStateAt(path string) (State, error) {
 	}
 
 	root := filepath.Dir(path)
-	sumPath := SumPath(root)
-	entries, err := LoadSum(sumPath)
+	lockPath := LockPath(root)
+	entries, err := LoadLock(lockPath)
 	if err != nil {
 		return State{}, err
 	}
@@ -76,10 +76,10 @@ func LoadStateAt(path string) (State, error) {
 	return State{
 		Root:         root,
 		ManifestPath: path,
-		SumPath:      sumPath,
+		LockPath:     lockPath,
 		Paths:        RepoPaths(root),
 		Config:       configValue,
-		Sum:          entries,
+		Lock:         entries,
 	}, nil
 }
 
@@ -90,12 +90,12 @@ func SaveState(state State) error {
 	if err := Save(state.ManifestPath, state.Config); err != nil {
 		return err
 	}
-	if len(state.Sum) == 0 {
-		if err := os.Remove(state.SumPath); err != nil && !os.IsNotExist(err) {
+	if len(state.Lock) == 0 {
+		if err := os.Remove(state.LockPath); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 		return nil
 	}
 
-	return SaveSum(state.SumPath, state.Sum)
+	return SaveLock(state.LockPath, state.Lock)
 }

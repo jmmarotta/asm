@@ -8,33 +8,52 @@ import (
 	"github.com/jmmarotta/agent_skills_manager/internal/manifest"
 )
 
-func Remove(name string) (RemoveReport, error) {
+func Remove(names []string) (RemoveReport, error) {
 	state, err := manifest.LoadState()
 	if err != nil {
 		return RemoveReport{}, err
 	}
 
-	removed, ok := state.Config.RemoveSkill(name)
-	if !ok {
-		return RemoveReport{}, fmt.Errorf("skill %q not found", name)
-	}
-	removedSummary := SkillSummary{
-		Name:    removed.Name,
-		Type:    removed.Type,
-		Origin:  removed.Origin,
-		Version: removed.Version,
-		Subdir:  removed.Subdir,
-	}
-	prunedStore := false
+	uniqueNames := uniqueRemoveNames(names)
+	removed := make([]SkillSummary, 0, len(uniqueNames))
+	warnings := []string{}
+	originOrder := []string{}
+	originSeen := map[string]bool{}
 
-	if removed.Type == "git" {
-		if !originInUse(state.Config, removed.Origin) {
-			delete(state.Config.Replace, removed.Origin)
-			deleteSumForOrigin(state.Sum, removed.Origin)
-			if err := os.RemoveAll(gitstore.RepoPath(state.Paths.StoreDir, removed.Origin)); err != nil {
+	for _, name := range uniqueNames {
+		skill, ok := state.Config.RemoveSkill(name)
+		if !ok {
+			warnings = append(warnings, fmt.Sprintf("skill %q not found", name))
+			continue
+		}
+		removed = append(removed, SkillSummary{
+			Name:    skill.Name,
+			Type:    skill.Type,
+			Origin:  skill.Origin,
+			Version: skill.Version,
+			Subdir:  skill.Subdir,
+		})
+		if skill.Type == "git" {
+			if !originSeen[skill.Origin] {
+				originSeen[skill.Origin] = true
+				originOrder = append(originOrder, skill.Origin)
+			}
+		}
+	}
+
+	if len(removed) == 0 {
+		return RemoveReport{Warnings: warnings, NoChanges: true}, nil
+	}
+
+	prunedStores := []string{}
+	for _, origin := range originOrder {
+		if !originInUse(state.Config, origin) {
+			delete(state.Config.Replace, origin)
+			deleteLockForOrigin(state.Lock, origin)
+			if err := os.RemoveAll(gitstore.RepoPath(state.Paths.StoreDir, origin)); err != nil {
 				return RemoveReport{}, err
 			}
-			prunedStore = true
+			prunedStores = append(prunedStores, origin)
 		}
 	}
 
@@ -47,7 +66,25 @@ func Remove(name string) (RemoveReport, error) {
 		return RemoveReport{}, fmt.Errorf("install skills: %w", err)
 	}
 
-	return RemoveReport{Install: report, Removed: removedSummary, PrunedStore: prunedStore}, nil
+	return RemoveReport{
+		Install:      report,
+		Removed:      removed,
+		PrunedStores: prunedStores,
+		Warnings:     warnings,
+	}, nil
+}
+
+func uniqueRemoveNames(names []string) []string {
+	unique := make([]string, 0, len(names))
+	seen := map[string]bool{}
+	for _, name := range names {
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		unique = append(unique, name)
+	}
+	return unique
 }
 
 func originInUse(configValue manifest.Config, origin string) bool {
@@ -59,10 +96,10 @@ func originInUse(configValue manifest.Config, origin string) bool {
 	return false
 }
 
-func deleteSumForOrigin(sum map[manifest.SumKey]string, origin string) {
-	for key := range sum {
+func deleteLockForOrigin(lock map[manifest.LockKey]string, origin string) {
+	for key := range lock {
 		if key.Origin == origin {
-			delete(sum, key)
+			delete(lock, key)
 		}
 	}
 }

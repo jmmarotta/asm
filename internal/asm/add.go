@@ -68,10 +68,10 @@ func Add(input string, pathFlag string) (InstallReport, error) {
 	}
 
 	if resolution.Type == "git" {
-		if state.Sum == nil {
-			state.Sum = map[manifest.SumKey]string{}
+		if state.Lock == nil {
+			state.Lock = map[manifest.LockKey]string{}
 		}
-		state.Sum[manifest.SumKey{Origin: resolution.Origin, Version: resolution.Version}] = resolution.Rev
+		state.Lock[manifest.LockKey{Origin: resolution.Origin, Version: resolution.Version}] = resolution.Rev
 	}
 
 	if err := manifest.SaveState(state); err != nil {

@@ -12,39 +12,39 @@ type OriginResolution struct {
 	Path         string
 	Rev          string
 	UsingReplace bool
-	SumChanged   bool
+	LockChanged  bool
 	Warning      string
 }
 
 type OriginPathsResult struct {
-	Paths      map[string]string
-	Warnings   []string
-	SumChanged bool
+	Paths       map[string]string
+	Warnings    []string
+	LockChanged bool
 }
 
-func ResolveOriginRevision(storeDir string, origin string, version string, replacePath string, sum map[manifest.SumKey]string, strict bool) (OriginResolution, error) {
+func ResolveOriginRevision(storeDir string, origin string, version string, replacePath string, lock map[manifest.LockKey]string, strict bool) (OriginResolution, error) {
 	if replacePath != "" {
 		if info, err := os.Stat(replacePath); err == nil && info.IsDir() {
-			rev, changed, err := ResolveRevision(replacePath, origin, version, sum, strict)
+			rev, changed, err := ResolveRevision(replacePath, origin, version, lock, strict)
 			if err == nil {
 				return OriginResolution{
 					Path:         replacePath,
 					Rev:          rev,
 					UsingReplace: true,
-					SumChanged:   changed,
+					LockChanged:  changed,
 				}, nil
 			}
 			warning := fmt.Sprintf("replace path for %s not usable (%v); falling back to remote", origin, err)
-			return resolveOriginFromStore(storeDir, origin, version, sum, strict, warning)
+			return resolveOriginFromStore(storeDir, origin, version, lock, strict, warning)
 		}
 		warning := fmt.Sprintf("replace path missing for %s (%s); falling back to remote", origin, replacePath)
-		return resolveOriginFromStore(storeDir, origin, version, sum, strict, warning)
+		return resolveOriginFromStore(storeDir, origin, version, lock, strict, warning)
 	}
 
-	return resolveOriginFromStore(storeDir, origin, version, sum, strict, "")
+	return resolveOriginFromStore(storeDir, origin, version, lock, strict, "")
 }
 
-func ResolveOrigins(storeDir string, origins map[string]string, replace map[string]string, sum map[manifest.SumKey]string, strict bool) (OriginPathsResult, error) {
+func ResolveOrigins(storeDir string, origins map[string]string, replace map[string]string, lock map[manifest.LockKey]string, strict bool) (OriginPathsResult, error) {
 	result := OriginPathsResult{Paths: map[string]string{}}
 	for origin, version := range origins {
 		debug.Logf("resolve origin origin=%s version=%s", debug.SanitizeOrigin(origin), version)
@@ -52,15 +52,15 @@ func ResolveOrigins(storeDir string, origins map[string]string, replace map[stri
 		if replace != nil {
 			replacePath = replace[origin]
 		}
-		resolution, err := ResolveOriginRevision(storeDir, origin, version, replacePath, sum, strict)
+		resolution, err := ResolveOriginRevision(storeDir, origin, version, replacePath, lock, strict)
 		if err != nil {
 			return result, fmt.Errorf("resolve origin %s: %w", debug.SanitizeOrigin(origin), err)
 		}
 		if resolution.Warning != "" {
 			result.Warnings = append(result.Warnings, resolution.Warning)
 		}
-		if resolution.SumChanged {
-			result.SumChanged = true
+		if resolution.LockChanged {
+			result.LockChanged = true
 		}
 		result.Paths[origin] = resolution.Path
 		applyWarning, err := ApplyOriginResolution(resolution)
@@ -74,22 +74,22 @@ func ResolveOrigins(storeDir string, origins map[string]string, replace map[stri
 	return result, nil
 }
 
-func resolveOriginFromStore(storeDir string, origin string, version string, sum map[manifest.SumKey]string, strict bool, warning string) (OriginResolution, error) {
+func resolveOriginFromStore(storeDir string, origin string, version string, lock map[manifest.LockKey]string, strict bool, warning string) (OriginResolution, error) {
 	path := RepoPath(storeDir, origin)
 	if err := EnsureRepo(path, origin); err != nil {
 		return OriginResolution{}, err
 	}
 
-	rev, changed, err := ResolveRevision(path, origin, version, sum, strict)
+	rev, changed, err := ResolveRevision(path, origin, version, lock, strict)
 	if err != nil {
 		return OriginResolution{}, err
 	}
 
 	return OriginResolution{
-		Path:       path,
-		Rev:        rev,
-		SumChanged: changed,
-		Warning:    warning,
+		Path:        path,
+		Rev:         rev,
+		LockChanged: changed,
+		Warning:     warning,
 	}, nil
 }
 

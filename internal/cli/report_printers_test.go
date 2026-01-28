@@ -107,11 +107,11 @@ func TestPrintRemoveReport(t *testing.T) {
 
 	printRemoveReport(asm.RemoveReport{
 		Install: asm.InstallReport{Linked: 0, Pruned: 1},
-		Removed: asm.SkillSummary{
+		Removed: []asm.SkillSummary{{
 			Name:   "foo",
 			Origin: "origin-a",
-		},
-		PrunedStore: true,
+		}},
+		PrunedStores: []string{"origin-a"},
 	}, &out, &errOut)
 
 	if !strings.Contains(out.String(), "Installed: 0, Pruned: 1, Warnings: 0") {
@@ -131,7 +131,7 @@ func TestPrintRemoveReportNoOrigin(t *testing.T) {
 
 	printRemoveReport(asm.RemoveReport{
 		Install: asm.InstallReport{Linked: 0, Pruned: 0},
-		Removed: asm.SkillSummary{Name: "foo"},
+		Removed: []asm.SkillSummary{{Name: "foo"}},
 	}, &out, &errOut)
 
 	if !strings.Contains(out.String(), "Removed: foo") {
@@ -139,6 +139,23 @@ func TestPrintRemoveReportNoOrigin(t *testing.T) {
 	}
 	if strings.Contains(out.String(), "Pruned store:") {
 		t.Fatalf("did not expect pruned store line: %q", out.String())
+	}
+}
+
+func TestPrintRemoveReportNoChanges(t *testing.T) {
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+
+	printRemoveReport(asm.RemoveReport{
+		Warnings:  []string{"skill \"foo\" not found"},
+		NoChanges: true,
+	}, &out, &errOut)
+
+	if out.String() != "No matching skills removed.\n" {
+		t.Fatalf("unexpected output: %q", out.String())
+	}
+	if errOut.String() != "warning: skill \"foo\" not found\n" {
+		t.Fatalf("unexpected warning output: %q", errOut.String())
 	}
 }
 

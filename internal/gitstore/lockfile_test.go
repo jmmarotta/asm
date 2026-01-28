@@ -23,11 +23,11 @@ func TestResolveRevisionMovedTagStrict(t *testing.T) {
 		t.Fatalf("move tag: %v", err)
 	}
 
-	sum := map[manifest.SumKey]string{
+	lock := map[manifest.LockKey]string{
 		{Origin: repoDir, Version: version}: commitHash.String(),
 	}
 
-	_, _, err := ResolveRevision(repoDir, repoDir, version, sum, true)
+	_, _, err := ResolveRevision(repoDir, repoDir, version, lock, true)
 	if err == nil {
 		t.Fatalf("expected moved tag error")
 	}
@@ -36,7 +36,7 @@ func TestResolveRevisionMovedTagStrict(t *testing.T) {
 	}
 }
 
-func TestResolveRevisionMovedTagNonStrictUpdatesSum(t *testing.T) {
+func TestResolveRevisionMovedTagNonStrictUpdatesLock(t *testing.T) {
 	version := "v1.0.0"
 	repoDir, repo, wt, commitHash := createTaggedRepo(t, version)
 
@@ -49,21 +49,21 @@ func TestResolveRevisionMovedTagNonStrictUpdatesSum(t *testing.T) {
 		t.Fatalf("move tag: %v", err)
 	}
 
-	key := manifest.SumKey{Origin: repoDir, Version: version}
-	sum := map[manifest.SumKey]string{key: commitHash.String()}
+	key := manifest.LockKey{Origin: repoDir, Version: version}
+	lock := map[manifest.LockKey]string{key: commitHash.String()}
 
-	rev, changed, err := ResolveRevision(repoDir, repoDir, version, sum, false)
+	rev, changed, err := ResolveRevision(repoDir, repoDir, version, lock, false)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
 	if !changed {
-		t.Fatalf("expected sum update")
+		t.Fatalf("expected lock update")
 	}
 	if rev != updated.String() {
 		t.Fatalf("expected %s, got %s", updated.String(), rev)
 	}
-	if sum[key] != updated.String() {
-		t.Fatalf("expected sum update, got %s", sum[key])
+	if lock[key] != updated.String() {
+		t.Fatalf("expected lock update, got %s", lock[key])
 	}
 }
 

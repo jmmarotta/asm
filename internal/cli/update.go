@@ -8,10 +8,11 @@ import (
 
 func newUpdateCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "update [name]",
-		Short: "Update skill revisions",
-		Args:  cobra.MaximumNArgs(1),
-		RunE:  runUpdate,
+		Use:     "update [name]",
+		Short:   "Update skill revisions",
+		Args:    cobra.MaximumNArgs(1),
+		Aliases: []string{"up"},
+		RunE:    runUpdate,
 	}
 
 	return cmd

@@ -30,8 +30,8 @@ func Update(name string) (UpdateReport, error) {
 	}
 	sort.Strings(updatedOrigins)
 
-	if state.Sum == nil {
-		state.Sum = map[manifest.SumKey]string{}
+	if state.Lock == nil {
+		state.Lock = map[manifest.LockKey]string{}
 	}
 
 	for origin, versionValue := range origins {
@@ -44,7 +44,7 @@ func Update(name string) (UpdateReport, error) {
 		if err != nil {
 			return UpdateReport{}, fmt.Errorf("resolve version %s: %w", versionValue, err)
 		}
-		state.Sum[manifest.SumKey{Origin: origin, Version: versionValue}] = rev
+		state.Lock[manifest.LockKey{Origin: origin, Version: versionValue}] = rev
 	}
 
 	if err := manifest.SaveState(state); err != nil {

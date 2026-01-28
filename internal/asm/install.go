@@ -28,7 +28,7 @@ func installSkills(state manifest.State) (InstallReport, error) {
 		return InstallReport{Pruned: prune.Removed, Warnings: prune.Warnings, NoSkills: true}, nil
 	}
 
-	sources, warnings, sumChanged, err := resolveInstallSources(state)
+	sources, warnings, lockChanged, err := resolveInstallSources(state)
 	if err != nil {
 		return InstallReport{}, fmt.Errorf("resolve sources: %w", err)
 	}
@@ -40,8 +40,8 @@ func installSkills(state manifest.State) (InstallReport, error) {
 
 	warnings = append(warnings, result.Warnings...)
 
-	if sumChanged {
-		if err := manifest.SaveSum(state.SumPath, state.Sum); err != nil {
+	if lockChanged {
+		if err := manifest.SaveLock(state.LockPath, state.Lock); err != nil {
 			return InstallReport{}, err
 		}
 	}
@@ -53,13 +53,13 @@ func resolveInstallSources(state manifest.State) ([]linker.Source, []linker.Warn
 	originVersions := state.Config.GitOriginVersions()
 	originPaths := make(map[string]string)
 	warnings := []linker.Warning{}
-	sumChanged := false
+	lockChanged := false
 	if len(originVersions) > 0 {
-		result, err := gitstore.ResolveOrigins(state.Paths.StoreDir, originVersions, state.Config.Replace, state.Sum, true)
+		result, err := gitstore.ResolveOrigins(state.Paths.StoreDir, originVersions, state.Config.Replace, state.Lock, true)
 		if err != nil {
 			return nil, nil, false, err
 		}
-		sumChanged = result.SumChanged
+		lockChanged = result.LockChanged
 		originPaths = result.Paths
 		for _, warning := range result.Warnings {
 			warnings = append(warnings, linker.Warning{Message: warning})
@@ -70,5 +70,5 @@ func resolveInstallSources(state manifest.State) ([]linker.Source, []linker.Warn
 	if err != nil {
 		return nil, nil, false, err
 	}
-	return sources, warnings, sumChanged, nil
+	return sources, warnings, lockChanged, nil
 }

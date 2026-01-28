@@ -4,7 +4,7 @@
 - Repo is a Go CLI (`asm`) for managing repo-local skill sources and installs.
 - Module name: `github.com/jmmarotta/agent_skills_manager` (Go `1.24.9`).
 - CLI commands live under `internal/cli`, entrypoint in `cmd/asm`.
-- Manifest lives at `skills.jsonc` (+ `skills.sum`), store/cache under `.asm/`, install under `./skills`.
+- Manifest lives at `skills.jsonc` (+ `skills-lock.json`), store/cache under `.asm/`, install under `./skills`.
 - Project planning docs live in `context/` (PRDs are append-only in Implementation Notes).
 
 ## Repo layout (high level)
@@ -66,7 +66,7 @@
 ### Manifest conventions
 - Manifest file preferred: `skills.jsonc`; fallback to `skills.json`.
 - Use `manifest.Load` / `manifest.Save` / `manifest.LoadState` for IO.
-- `skills.sum` stores origin/version -> commit resolution.
+- `skills-lock.json` stores origin/version -> commit resolution.
 - Validate manifests via `Config.Validate()`; fail fast on missing fields.
 
 ### Source handling

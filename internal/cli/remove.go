@@ -8,17 +8,18 @@ import (
 
 func newRemoveCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "remove <name>",
-		Short: "Remove a skill",
-		Args:  cobra.ExactArgs(1),
-		RunE:  runRemove,
+		Use:     "remove <name> [<name>...]",
+		Short:   "Remove skills",
+		Args:    cobra.MinimumNArgs(1),
+		Aliases: []string{"rm", "uninstall"},
+		RunE:    runRemove,
 	}
 
 	return cmd
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {
-	report, err := asm.Remove(args[0])
+	report, err := asm.Remove(args)
 	if err != nil {
 		return err
 	}

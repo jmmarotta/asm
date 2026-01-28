@@ -50,7 +50,7 @@ Ensure `$(go env GOPATH)/bin` (or `GOBIN`) is on your `PATH`.
 ## Storage locations
 Repo-local scope:
 - Manifest: `<repo>/skills.jsonc` (or `skills.json`)
-- Sum: `<repo>/skills.sum`
+- Lockfile: `<repo>/skills-lock.json`
 - Store: `<repo>/.asm/store/`
 - Cache: `<repo>/.asm/cache/`
 - Install: `<repo>/skills/`

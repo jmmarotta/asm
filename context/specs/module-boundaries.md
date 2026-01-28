@@ -20,7 +20,7 @@
 ## Key invariants
 - Manifest enforces unique skill names and unique `(origin, subdir)` identities.
 - Subdir values are normalized and must be relative (no absolute or escape paths).
-- `skills.sum` maps `(origin, version)` to a commit; moved tags are an error in strict mode.
+- `skills-lock.json` maps `(origin, version)` to a commit; moved tags are an error in strict mode.
 - Install never deletes real files/dirs; only expected symlinks are pruned.
 
 ## Reporting

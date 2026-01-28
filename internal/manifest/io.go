@@ -1,7 +1,6 @@
 package manifest
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,7 +15,9 @@ import (
 const (
 	jsoncFilename = "skills.jsonc"
 	jsonFilename  = "skills.json"
-	sumFilename   = "skills.sum"
+	lockFilename  = "skills-lock.json"
+
+	lockSchemaVersion = 1
 )
 
 var ErrManifestNotFound = errors.New("skills.jsonc not found")
@@ -56,8 +57,8 @@ func DefaultManifestPath(root string) string {
 	return filepath.Join(root, jsoncFilename)
 }
 
-func SumPath(root string) string {
-	return filepath.Join(root, sumFilename)
+func LockPath(root string) string {
+	return filepath.Join(root, lockFilename)
 }
 
 func Load(path string) (Config, error) {
@@ -116,74 +117,88 @@ func Save(path string, config Config) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-func LoadSum(path string) (map[SumKey]string, error) {
-	entries := make(map[SumKey]string)
+type lockFile struct {
+	Schema  int         `json:"schema"`
+	Entries []LockEntry `json:"entries"`
+}
+
+type LockEntry struct {
+	Origin  string `json:"origin"`
+	Version string `json:"version"`
+	Rev     string `json:"rev"`
+}
+
+func LoadLock(path string) (map[LockKey]string, error) {
+	entries := make(map[LockKey]string)
 	if path == "" {
-		return entries, fmt.Errorf("sum path is required")
+		return entries, fmt.Errorf("lock path is required")
 	}
 
-	file, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return entries, nil
 		}
 		return nil, err
 	}
-	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) != 3 {
-			return nil, fmt.Errorf("invalid skills.sum entry: %q", line)
-		}
-		key := SumKey{Origin: fields[0], Version: fields[1]}
-		if existing, ok := entries[key]; ok && existing != fields[2] {
-			return nil, fmt.Errorf("skills.sum has conflicting entries for %s %s", key.Origin, key.Version)
-		}
-		entries[key] = fields[2]
+	var parsed lockFile
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return nil, err
+	}
+	if parsed.Schema != 0 && parsed.Schema != lockSchemaVersion {
+		return nil, fmt.Errorf("unsupported lock schema %d", parsed.Schema)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, err
+	for _, entry := range parsed.Entries {
+		if entry.Origin == "" || entry.Version == "" || entry.Rev == "" {
+			return nil, fmt.Errorf("invalid skills-lock.json entry: origin=%q version=%q rev=%q", entry.Origin, entry.Version, entry.Rev)
+		}
+		key := LockKey{Origin: entry.Origin, Version: entry.Version}
+		if existing, ok := entries[key]; ok && existing != entry.Rev {
+			return nil, fmt.Errorf("skills-lock.json has conflicting entries for %s %s", key.Origin, key.Version)
+		}
+		entries[key] = entry.Rev
 	}
 
 	return entries, nil
 }
 
-func SaveSum(path string, entries map[SumKey]string) error {
+func SaveLock(path string, entries map[LockKey]string) error {
 	if path == "" {
-		return fmt.Errorf("sum path is required")
+		return fmt.Errorf("lock path is required")
 	}
 
-	keys := make([]SumKey, 0, len(entries))
-	for key := range entries {
-		keys = append(keys, key)
+	lockEntries := make([]LockEntry, 0, len(entries))
+	for key, rev := range entries {
+		lockEntries = append(lockEntries, LockEntry{Origin: key.Origin, Version: key.Version, Rev: rev})
 	}
 
-	sort.Slice(keys, func(i, j int) bool {
-		left := keys[i]
-		right := keys[j]
+	sort.Slice(lockEntries, func(i, j int) bool {
+		left := lockEntries[i]
+		right := lockEntries[j]
 		if left.Origin != right.Origin {
 			return left.Origin < right.Origin
 		}
-		return left.Version < right.Version
+		if left.Version != right.Version {
+			return left.Version < right.Version
+		}
+		return left.Rev < right.Rev
 	})
 
-	builder := &strings.Builder{}
-	for _, key := range keys {
-		fmt.Fprintf(builder, "%s %s %s\n", key.Origin, key.Version, entries[key])
+	payload, err := json.MarshalIndent(lockFile{Schema: lockSchemaVersion, Entries: lockEntries}, "", "  ")
+	if err != nil {
+		return err
+	}
+	if len(payload) == 0 || payload[len(payload)-1] != '\n' {
+		payload = append(payload, '\n')
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
 
-	return os.WriteFile(path, []byte(builder.String()), 0o644)
+	return os.WriteFile(path, payload, 0o644)
 }
 
 func resolveManifestPath(root string) (string, bool, error) {

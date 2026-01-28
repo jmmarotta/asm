@@ -8,9 +8,10 @@ import (
 
 func newInstallCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "install",
-		Short: "Install skills to ./skills",
-		RunE:  runInstall,
+		Use:     "install",
+		Short:   "Install skills to ./skills",
+		Aliases: []string{"i"},
+		RunE:    runInstall,
 	}
 
 	return cmd

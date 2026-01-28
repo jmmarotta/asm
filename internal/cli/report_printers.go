@@ -75,18 +75,25 @@ func printUpdateReport(report asm.UpdateReport, out io.Writer, errOut io.Writer)
 }
 
 func printRemoveReport(report asm.RemoveReport, out io.Writer, errOut io.Writer) {
-	printInstallReport(report.Install, out, errOut)
-	if report.Install.NoSkills {
+	for _, warning := range report.Warnings {
+		fmt.Fprintf(errOut, "warning: %s\n", warning)
+	}
+	if report.NoChanges {
+		fmt.Fprintln(out, "No matching skills removed.")
 		return
 	}
-	if report.Removed.Name != "" {
-		if report.Removed.Origin != "" {
-			fmt.Fprintf(out, "Removed: %s (%s)\n", report.Removed.Name, report.Removed.Origin)
+	printInstallReport(report.Install, out, errOut)
+	for _, removed := range report.Removed {
+		if removed.Name == "" {
+			continue
+		}
+		if removed.Origin != "" {
+			fmt.Fprintf(out, "Removed: %s (%s)\n", removed.Name, removed.Origin)
 		} else {
-			fmt.Fprintf(out, "Removed: %s\n", report.Removed.Name)
+			fmt.Fprintf(out, "Removed: %s\n", removed.Name)
 		}
 	}
-	if report.PrunedStore {
-		fmt.Fprintf(out, "Pruned store: %s\n", report.Removed.Origin)
+	for _, origin := range report.PrunedStores {
+		fmt.Fprintf(out, "Pruned store: %s\n", origin)
 	}
 }

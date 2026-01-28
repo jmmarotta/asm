@@ -171,7 +171,7 @@ None.
 
 ### 2026-01-27
 **Decisions**
-- Repo-local only: manifest is `skills.jsonc` (+ `skills.sum`) in repo root.
+- Repo-local only: manifest is `skills.jsonc` (+ `skills-lock.json`) in repo root.
 - Store/cache live under `.asm/`, installs land in `./skills`.
 - Store identity derives from `origin` (no ref/scoped variants).
 - Dropped viper; no env-config layer is used.

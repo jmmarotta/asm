@@ -39,7 +39,7 @@ asm add https://github.com/org/repo/tree/main/plugins/foo
 
 ## Files
 - `skills.jsonc` (manifest; fallback `skills.json`)
-- `skills.sum` (resolved revisions; go.sum analogue)
+- `skills-lock.json` (resolved revisions; go.sum analogue)
 - `.asm/` (store + cache)
 - `skills/` (installed symlinks; gitignored)
 
@@ -70,10 +70,12 @@ Notes:
 - `asm init [--cwd path]`
 - `asm add <path-or-url> [--path subdir]`
 - `asm update [name]`
-- `asm remove <name>`
+- `asm remove <name> [<name>...]`
 - `asm install`
 - `asm ls`
 - `asm show <name>`
+
+Aliases: `add` = `a`, `install` = `i`, `remove` = `rm`/`uninstall`, `update` = `up`.
 
 ## Install behavior
 - Skills are symlinked to `skills/<name>`.

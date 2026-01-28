@@ -164,3 +164,12 @@ None.
 
 **Verification**
 - N/A (documentation cleanup only).
+
+### 2026-01-27
+**Changes**
+- `asm remove` accepts multiple skill names and reports each removal.
+- Missing skills during removal emit warnings and do not fail the command.
+- Removal reporting and CLI tests updated to cover multi-skill and no-op flows.
+
+**Verification**
+- `go test ./...`

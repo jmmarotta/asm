@@ -31,8 +31,8 @@ func TestInitCreatesManifestAndDirs(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(repo, "skills")); err != nil {
 		t.Fatalf("skills dir: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(repo, "skills.sum")); !os.IsNotExist(err) {
-		t.Fatalf("expected no skills.sum")
+	if _, err := os.Stat(filepath.Join(repo, "skills-lock.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected no skills-lock.json")
 	}
 
 	content := readGitignore(t, repo)

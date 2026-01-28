@@ -22,7 +22,7 @@ type Skill struct {
 	Version string `json:"version,omitempty"`
 }
 
-type SumKey struct {
+type LockKey struct {
 	Origin  string
 	Version string
 }

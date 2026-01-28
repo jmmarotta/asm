@@ -42,7 +42,9 @@ type UpdateReport struct {
 }
 
 type RemoveReport struct {
-	Install     InstallReport
-	Removed     SkillSummary
-	PrunedStore bool
+	Install      InstallReport
+	Removed      []SkillSummary
+	PrunedStores []string
+	Warnings     []string
+	NoChanges    bool
 }

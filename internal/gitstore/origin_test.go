@@ -26,9 +26,9 @@ func TestResolveOriginRevisionReplaceMissing(t *testing.T) {
 
 	storeDir := t.TempDir()
 	replacePath := filepath.Join(t.TempDir(), "missing")
-	sum := map[manifest.SumKey]string{}
+	lock := map[manifest.LockKey]string{}
 
-	resolution, err := ResolveOriginRevision(storeDir, repoDir, "v1.0.0", replacePath, sum, true)
+	resolution, err := ResolveOriginRevision(storeDir, repoDir, "v1.0.0", replacePath, lock, true)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -61,9 +61,9 @@ func TestResolveOriginRevisionReplaceNotUsable(t *testing.T) {
 
 	storeDir := t.TempDir()
 	replacePath := t.TempDir()
-	sum := map[manifest.SumKey]string{}
+	lock := map[manifest.LockKey]string{}
 
-	resolution, err := ResolveOriginRevision(storeDir, repoDir, "v1.0.0", replacePath, sum, true)
+	resolution, err := ResolveOriginRevision(storeDir, repoDir, "v1.0.0", replacePath, lock, true)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestApplyOriginResolutionReplaceMismatch(t *testing.T) {
 		Path:         repoDir,
 		Rev:          commitHash.String(),
 		UsingReplace: true,
-		SumChanged:   false,
+		LockChanged:  false,
 	}
 
 	warning, err := ApplyOriginResolution(resolution)
@@ -132,7 +132,7 @@ func TestApplyOriginResolutionReplaceMatchNoWarning(t *testing.T) {
 		Path:         repoDir,
 		Rev:          commitHash.String(),
 		UsingReplace: true,
-		SumChanged:   false,
+		LockChanged:  false,
 	}
 
 	warning, err := ApplyOriginResolution(resolution)
@@ -166,7 +166,7 @@ func TestApplyOriginResolutionCheckout(t *testing.T) {
 		Path:         repoDir,
 		Rev:          commitHash.String(),
 		UsingReplace: false,
-		SumChanged:   false,
+		LockChanged:  false,
 	}
 
 	warning, err := ApplyOriginResolution(resolution)
