@@ -27,12 +27,12 @@ func TestSourcesFromSkillPaths(t *testing.T) {
 func TestSourcesFromConfig(t *testing.T) {
 	config := manifest.Config{
 		Skills: []manifest.Skill{
-			{Name: "local", Type: "path", Origin: "/tmp/local"},
-			{Name: "remote", Type: "git", Origin: "origin-a", Subdir: "plugins/foo"},
+			{Name: "local", Origin: "/tmp/local"},
+			{Name: "remote", Origin: "https://example.com/repo", Subdir: "plugins/foo", Version: "v1.0.0"},
 		},
 	}
 
-	originPaths := map[string]string{"origin-a": "/store/repo"}
+	originPaths := map[string]string{"https://example.com/repo": "/store/repo"}
 
 	sources, err := SourcesFromConfig(config, originPaths)
 	if err != nil {
@@ -51,7 +51,7 @@ func TestSourcesFromConfig(t *testing.T) {
 
 func TestSourcesFromConfigMissingOrigin(t *testing.T) {
 	config := manifest.Config{
-		Skills: []manifest.Skill{{Name: "remote", Type: "git", Origin: "origin-a"}},
+		Skills: []manifest.Skill{{Name: "remote", Origin: "https://example.com/repo", Version: "v1.0.0"}},
 	}
 
 	_, err := SourcesFromConfig(config, map[string]string{})

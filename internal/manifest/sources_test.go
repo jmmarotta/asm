@@ -9,9 +9,9 @@ import (
 func TestGitOriginVersions(t *testing.T) {
 	config := Config{
 		Skills: []Skill{
-			{Name: "one", Type: "git", Origin: "origin-a", Version: "v1.0.0"},
-			{Name: "two", Type: "path", Origin: "/tmp/local"},
-			{Name: "three", Type: "git", Origin: "origin-b", Version: "v2.0.0"},
+			{Name: "one", Origin: "https://example.com/repo-a", Version: "v1.0.0"},
+			{Name: "two", Origin: "/tmp/local"},
+			{Name: "three", Origin: "https://example.com/repo-b", Version: "v2.0.0"},
 		},
 	}
 
@@ -19,11 +19,11 @@ func TestGitOriginVersions(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("expected 2 origins, got %d", len(got))
 	}
-	if got["origin-a"] != "v1.0.0" {
-		t.Fatalf("expected origin-a version v1.0.0, got %q", got["origin-a"])
+	if got["https://example.com/repo-a"] != "v1.0.0" {
+		t.Fatalf("expected repo-a version v1.0.0, got %q", got["https://example.com/repo-a"])
 	}
-	if got["origin-b"] != "v2.0.0" {
-		t.Fatalf("expected origin-b version v2.0.0, got %q", got["origin-b"])
+	if got["https://example.com/repo-b"] != "v2.0.0" {
+		t.Fatalf("expected repo-b version v2.0.0, got %q", got["https://example.com/repo-b"])
 	}
 	if _, ok := got["/tmp/local"]; ok {
 		t.Fatalf("expected path origin to be excluded")
@@ -33,13 +33,13 @@ func TestGitOriginVersions(t *testing.T) {
 func TestResolveSkillPaths(t *testing.T) {
 	config := Config{
 		Skills: []Skill{
-			{Name: "local", Type: "path", Origin: "/tmp/local"},
-			{Name: "remote", Type: "git", Origin: "origin-a", Subdir: "plugins/foo"},
+			{Name: "local", Origin: "/tmp/local"},
+			{Name: "remote", Origin: "https://example.com/repo", Subdir: "plugins/foo", Version: "v1.0.0"},
 		},
 	}
 
 	originPaths := map[string]string{
-		"origin-a": "/store/repo",
+		"https://example.com/repo": "/store/repo",
 	}
 
 	paths, err := config.ResolveSkillPaths(originPaths)
@@ -63,7 +63,7 @@ func TestResolveSkillPaths(t *testing.T) {
 func TestResolveSkillPathsMissingOrigin(t *testing.T) {
 	config := Config{
 		Skills: []Skill{
-			{Name: "remote", Type: "git", Origin: "origin-a", Subdir: "plugins/foo"},
+			{Name: "remote", Origin: "https://example.com/repo", Subdir: "plugins/foo", Version: "v1.0.0"},
 		},
 	}
 
@@ -75,8 +75,8 @@ func TestResolveSkillPathsMissingOrigin(t *testing.T) {
 	if !errors.As(err, &missing) {
 		t.Fatalf("expected MissingOriginPathError, got %T", err)
 	}
-	if missing.Origin != "origin-a" {
-		t.Fatalf("expected origin-a, got %q", missing.Origin)
+	if missing.Origin != "https://example.com/repo" {
+		t.Fatalf("expected https://example.com/repo, got %q", missing.Origin)
 	}
 	if missing.Skill != "remote" {
 		t.Fatalf("expected skill remote, got %q", missing.Skill)

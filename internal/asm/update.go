@@ -36,15 +36,14 @@ func Update(name string) (UpdateReport, error) {
 
 	for origin, versionValue := range origins {
 		debug.Logf("update origin=%s version=%s", debug.SanitizeOrigin(origin), versionValue)
-		path := gitstore.RepoPath(state.Paths.StoreDir, origin)
-		if err := gitstore.EnsureRepo(path, origin); err != nil {
+		replacePath := ""
+		if state.Config.Replace != nil {
+			replacePath = state.Config.Replace[origin]
+		}
+		_, err := gitstore.ResolveOriginRevision(state.Paths.StoreDir, origin, versionValue, replacePath, state.Lock, false)
+		if err != nil {
 			return UpdateReport{}, err
 		}
-		rev, err := gitstore.ResolveForVersionAt(path, versionValue)
-		if err != nil {
-			return UpdateReport{}, fmt.Errorf("resolve version %s: %w", versionValue, err)
-		}
-		state.Lock[manifest.LockKey{Origin: origin, Version: versionValue}] = rev
 	}
 
 	if err := manifest.SaveState(state); err != nil {
@@ -63,7 +62,7 @@ func resolveUpdateOrigins(configValue manifest.Config, name string) (map[string]
 	origins := make(map[string]string)
 	if name == "" {
 		for _, skill := range configValue.Skills {
-			if skill.Type != "git" {
+			if skill.Version == "" {
 				continue
 			}
 			origins[skill.Origin] = skill.Version
@@ -75,8 +74,8 @@ func resolveUpdateOrigins(configValue manifest.Config, name string) (map[string]
 	if !found {
 		return nil, fmt.Errorf("skill %q not found", name)
 	}
-	if skill.Type != "git" {
-		return nil, fmt.Errorf("skill %q is not a git source", name)
+	if skill.Version == "" {
+		return nil, fmt.Errorf("skill %q does not have a version", name)
 	}
 	origins[skill.Origin] = skill.Version
 	return origins, nil

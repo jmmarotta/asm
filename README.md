@@ -49,7 +49,6 @@ asm add https://github.com/org/repo/tree/main/plugins/foo
   "skills": [
     {
       "name": "author/skill",
-      "type": "git",
       "origin": "https://github.com/org/repo",
       "subdir": "plugins/foo",
       "version": "v1.2.3"
@@ -62,8 +61,8 @@ asm add https://github.com/org/repo/tree/main/plugins/foo
 ```
 
 Notes:
-- `type:"git"` requires `version` (semver tag or Go pseudo-version).
-- `type:"path"` uses `origin` as a local directory (non-portable).
+- `version` is required for git sources (semver tag or Go pseudo-version).
+- Omit `version` for local path sources; `origin` is the directory (non-portable).
 - `replace` is best-effort: if the path is missing, installs fall back to remote.
 
 ## Commands

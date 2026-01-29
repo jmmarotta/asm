@@ -19,7 +19,6 @@ func Show(name string) (ShowReport, error) {
 
 	return ShowReport{
 		Name:    skill.Name,
-		Type:    skill.Type,
 		Origin:  skill.Origin,
 		Subdir:  skill.Subdir,
 		Version: skill.Version,

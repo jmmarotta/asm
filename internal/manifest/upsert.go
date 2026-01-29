@@ -9,7 +9,6 @@ type DiscoveredSkill struct {
 
 type UpsertOptions struct {
 	Origin  string
-	Type    string
 	Version string
 	Author  string
 }
@@ -17,9 +16,6 @@ type UpsertOptions struct {
 func (config *Config) UpsertDiscoveredSkills(skills []DiscoveredSkill, opts UpsertOptions) error {
 	if opts.Origin == "" {
 		return fmt.Errorf("origin is required")
-	}
-	if opts.Type == "" {
-		return fmt.Errorf("type is required")
 	}
 	if opts.Author == "" {
 		opts.Author = "unknown"
@@ -40,9 +36,9 @@ func (config *Config) UpsertDiscoveredSkills(skills []DiscoveredSkill, opts Upse
 		existingByName[skill.Name] = identity
 	}
 
-	if opts.Type == "git" {
+	if opts.Version != "" {
 		for index, skill := range config.Skills {
-			if skill.Type == "git" && skill.Origin == opts.Origin {
+			if skill.Origin == opts.Origin && skill.Version != "" {
 				skill.Version = opts.Version
 				config.Skills[index] = skill
 			}
@@ -67,13 +63,10 @@ func (config *Config) UpsertDiscoveredSkills(skills []DiscoveredSkill, opts Upse
 
 		entry := Skill{
 			Name:   name,
-			Type:   opts.Type,
 			Origin: opts.Origin,
 			Subdir: normalizedSubdir,
 		}
-		if opts.Type == "git" {
-			entry.Version = opts.Version
-		}
+		entry.Version = opts.Version
 		config.UpsertSkill(entry)
 		existingByIdentity[identity] = name
 		existingByName[name] = identity

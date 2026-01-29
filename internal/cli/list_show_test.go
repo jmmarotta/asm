@@ -17,7 +17,6 @@ func TestLsAndShow(t *testing.T) {
 	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{
 		Skills: []manifest.Skill{{
 			Name:   "foo",
-			Type:   "path",
 			Origin: skillDir,
 		}},
 	}); err != nil {
@@ -58,7 +57,6 @@ func TestDebugFlagWritesToStderr(t *testing.T) {
 	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{
 		Skills: []manifest.Skill{{
 			Name:   "foo",
-			Type:   "path",
 			Origin: skillDir,
 		}},
 	}); err != nil {
@@ -91,14 +89,14 @@ func TestShowIncludesReplaceAndVersion(t *testing.T) {
 	setWorkingDir(t, repo)
 
 	replacePath := filepath.Join(t.TempDir(), "repo")
+	origin := "https://example.com/repo"
 	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{
 		Skills: []manifest.Skill{{
 			Name:    "foo",
-			Type:    "git",
-			Origin:  "origin-a",
+			Origin:  origin,
 			Version: "v1.0.0",
 		}},
-		Replace: map[string]string{"origin-a": replacePath},
+		Replace: map[string]string{origin: replacePath},
 	}); err != nil {
 		t.Fatalf("save manifest: %v", err)
 	}
@@ -129,7 +127,6 @@ func TestShowOmitsEmptyFields(t *testing.T) {
 	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{
 		Skills: []manifest.Skill{{
 			Name:   "foo",
-			Type:   "path",
 			Origin: skillDir,
 		}},
 	}); err != nil {
@@ -154,5 +151,8 @@ func TestShowOmitsEmptyFields(t *testing.T) {
 	}
 	if _, ok := output["subdir"]; ok {
 		t.Fatalf("expected subdir omitted")
+	}
+	if _, ok := output["type"]; ok {
+		t.Fatalf("expected type omitted")
 	}
 }

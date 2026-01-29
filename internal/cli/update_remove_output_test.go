@@ -16,16 +16,17 @@ func TestUpdateOutputIncludesOrigins(t *testing.T) {
 	repo := t.TempDir()
 	setWorkingDir(t, repo)
 
-	origin := t.TempDir()
-	initTaggedRepo(t, origin, "v1.0.0")
+	originPath := t.TempDir()
+	initTaggedRepo(t, originPath, "v1.0.0")
+	origin := "https://example.com/repo"
 
 	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{
 		Skills: []manifest.Skill{{
 			Name:    "foo",
-			Type:    "git",
 			Origin:  origin,
 			Version: "v1.0.0",
 		}},
+		Replace: map[string]string{origin: originPath},
 	}); err != nil {
 		t.Fatalf("save manifest: %v", err)
 	}
@@ -56,8 +57,8 @@ func TestRemoveOutputIncludesSummary(t *testing.T) {
 
 	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{
 		Skills: []manifest.Skill{
-			{Name: "foo", Type: "path", Origin: skillRoot},
-			{Name: "bar", Type: "path", Origin: otherRoot},
+			{Name: "foo", Origin: skillRoot},
+			{Name: "bar", Origin: otherRoot},
 		},
 	}); err != nil {
 		t.Fatalf("save manifest: %v", err)
@@ -100,8 +101,8 @@ func TestRemoveMultipleOutputs(t *testing.T) {
 
 	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{
 		Skills: []manifest.Skill{
-			{Name: "foo", Type: "path", Origin: skillRoot},
-			{Name: "bar", Type: "path", Origin: otherRoot},
+			{Name: "foo", Origin: skillRoot},
+			{Name: "bar", Origin: otherRoot},
 		},
 	}); err != nil {
 		t.Fatalf("save manifest: %v", err)

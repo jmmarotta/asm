@@ -8,7 +8,6 @@ import (
 )
 
 type Input struct {
-	Type      string
 	Origin    string
 	Ref       string
 	Subdir    string
@@ -18,6 +17,14 @@ type Input struct {
 }
 
 func ParseInput(input string, pathFlag string) (Input, error) {
+	normalized, _, err := NormalizeFileOrigin(input)
+	if err != nil {
+		return Input{}, err
+	}
+	input = normalized
+	if err := ValidateOriginScheme(input); err != nil {
+		return Input{}, err
+	}
 	if IsRemoteOrigin(input) {
 		return parseRemoteInput(input, pathFlag)
 	}
@@ -67,7 +74,6 @@ func parseLocalInput(input string, pathFlag string) (Input, error) {
 	}
 
 	return Input{
-		Type:      "path",
 		Origin:    origin,
 		Ref:       "",
 		Subdir:    subdir,
@@ -87,7 +93,6 @@ func parseRemoteInput(input string, pathFlag string) (Input, error) {
 	}
 
 	return Input{
-		Type:    "git",
 		Origin:  origin,
 		Ref:     ref,
 		Subdir:  subdir,

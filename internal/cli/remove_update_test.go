@@ -18,7 +18,6 @@ func TestRemovePrunesSymlink(t *testing.T) {
 	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{
 		Skills: []manifest.Skill{{
 			Name:   "foo",
-			Type:   "path",
 			Origin: skillRoot,
 		}},
 	}); err != nil {
@@ -62,7 +61,6 @@ func TestRemoveMissingSkillNoChanges(t *testing.T) {
 	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{
 		Skills: []manifest.Skill{{
 			Name:   "foo",
-			Type:   "path",
 			Origin: skillRoot,
 		}},
 	}); err != nil {

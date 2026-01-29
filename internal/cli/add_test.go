@@ -35,8 +35,40 @@ func TestAddLocalPathCreatesManifestAndSymlink(t *testing.T) {
 		t.Fatalf("expected 1 skill, got %d", len(loaded.Skills))
 	}
 	skill := loaded.Skills[0]
-	if skill.Type != "path" {
-		t.Fatalf("expected path type, got %s", skill.Type)
+	if skill.Version != "" {
+		t.Fatalf("expected empty version for local skill, got %q", skill.Version)
+	}
+	if skill.Origin != skillRoot {
+		t.Fatalf("expected origin %q, got %q", skillRoot, skill.Origin)
+	}
+
+	assertSymlink(t, filepath.Join(repo, "skills", skill.Name), skillRoot)
+}
+
+func TestAddFileURIPathCreatesManifestAndSymlink(t *testing.T) {
+	repo := t.TempDir()
+	setWorkingDir(t, repo)
+
+	skillRoot := filepath.Join(t.TempDir(), "foo")
+	touchSkill(t, skillRoot)
+	fileURI := "file://" + filepath.ToSlash(skillRoot)
+
+	cmd, _, _ := newTestCommand()
+	cmd.SetArgs([]string{"add", fileURI})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+
+	loaded, err := manifest.Load(filepath.Join(repo, "skills.jsonc"))
+	if err != nil {
+		t.Fatalf("load manifest: %v", err)
+	}
+	if len(loaded.Skills) != 1 {
+		t.Fatalf("expected 1 skill, got %d", len(loaded.Skills))
+	}
+	skill := loaded.Skills[0]
+	if skill.Version != "" {
+		t.Fatalf("expected empty version for local skill, got %q", skill.Version)
 	}
 	if skill.Origin != skillRoot {
 		t.Fatalf("expected origin %q, got %q", skillRoot, skill.Origin)

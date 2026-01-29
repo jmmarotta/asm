@@ -34,13 +34,12 @@ func printListReport(report asm.ListReport, out io.Writer) error {
 	}
 
 	writer := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(writer, "NAME\tTYPE\tORIGIN\tVERSION\tSUBDIR")
+	fmt.Fprintln(writer, "NAME\tORIGIN\tVERSION\tSUBDIR")
 	for _, skill := range report.Skills {
 		fmt.Fprintf(
 			writer,
-			"%s\t%s\t%s\t%s\t%s\n",
+			"%s\t%s\t%s\t%s\n",
 			skill.Name,
-			skill.Type,
 			skill.Origin,
 			skill.Version,
 			skill.Subdir,

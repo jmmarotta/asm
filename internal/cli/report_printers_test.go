@@ -176,7 +176,6 @@ func TestPrintListReport(t *testing.T) {
 	report := asm.ListReport{
 		Skills: []asm.SkillSummary{{
 			Name:    "foo",
-			Type:    "path",
 			Origin:  "/tmp/skill",
 			Version: "",
 			Subdir:  "",
@@ -186,7 +185,7 @@ func TestPrintListReport(t *testing.T) {
 	if err := printListReport(report, &out); err != nil {
 		t.Fatalf("print list: %v", err)
 	}
-	if !strings.Contains(out.String(), "NAME") || !strings.Contains(out.String(), "TYPE") {
+	if !strings.Contains(out.String(), "NAME") || !strings.Contains(out.String(), "ORIGIN") {
 		t.Fatalf("missing header: %q", out.String())
 	}
 	if !strings.Contains(out.String(), "foo") {
@@ -199,7 +198,6 @@ func TestPrintShowReport(t *testing.T) {
 
 	report := asm.ShowReport{
 		Name:    "foo",
-		Type:    "git",
 		Origin:  "origin-a",
 		Subdir:  "bar",
 		Version: "v1.0.0",

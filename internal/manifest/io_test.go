@@ -12,12 +12,12 @@ func TestLoadPrefersJSONC(t *testing.T) {
 	jsoncPath := filepath.Join(root, "skills.jsonc")
 	jsonPath := filepath.Join(root, "skills.json")
 
-	if err := os.WriteFile(jsonPath, []byte(`{"skills": [{"name": "json", "type": "git", "origin": "x", "version": "v1.0.0"}]}`), 0o644); err != nil {
+	if err := os.WriteFile(jsonPath, []byte(`{"skills": [{"name": "json", "origin": "https://example.com/repo", "version": "v1.0.0"}]}`), 0o644); err != nil {
 		t.Fatalf("write json: %v", err)
 	}
 	if err := os.WriteFile(jsoncPath, []byte(`// comment
 {
-  "skills": [{"name": "jsonc", "type": "git", "origin": "y", "version": "v1.0.0"}]
+	"skills": [{"name": "jsonc", "origin": "https://example.com/repo", "version": "v1.0.0"}]
 }`), 0o644); err != nil {
 		t.Fatalf("write jsonc: %v", err)
 	}
@@ -41,7 +41,6 @@ func TestSaveAndLoadRelativePaths(t *testing.T) {
 	input := Config{
 		Skills: []Skill{{
 			Name:   "local",
-			Type:   "path",
 			Origin: local,
 		}},
 		Replace: map[string]string{
@@ -73,5 +72,71 @@ func TestSaveAndLoadRelativePaths(t *testing.T) {
 	}
 	if loaded.Replace["https://example.com/repo"] != local {
 		t.Fatalf("expected expanded replace path, got %q", loaded.Replace["https://example.com/repo"])
+	}
+}
+
+func TestSaveDoesNotEmitTypeField(t *testing.T) {
+	root := t.TempDir()
+	configPath := filepath.Join(root, "skills.jsonc")
+	input := Config{
+		Skills: []Skill{{
+			Name:    "remote",
+			Origin:  "https://example.com/repo",
+			Version: "v1.0.0",
+		}},
+	}
+
+	if err := Save(configPath, input); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if strings.Contains(string(data), "\"type\"") {
+		t.Fatalf("expected no type field, got %s", string(data))
+	}
+}
+
+func TestLoadNormalizesFileURIOriginsAndReplace(t *testing.T) {
+	root := t.TempDir()
+	local := filepath.Join(root, "local")
+	if err := os.MkdirAll(local, 0o755); err != nil {
+		t.Fatalf("mkdir local: %v", err)
+	}
+	configPath := filepath.Join(root, "skills.jsonc")
+	fileURI := "file://" + filepath.ToSlash(local)
+	payload := `{"skills": [{"name": "local", "origin": "` + fileURI + `"}], "replace": {"https://example.com/repo": "` + fileURI + `"}}`
+	if err := os.WriteFile(configPath, []byte(payload), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	loaded, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if loaded.Skills[0].Origin != local {
+		t.Fatalf("expected file uri origin %q, got %q", local, loaded.Skills[0].Origin)
+	}
+	if loaded.Replace["https://example.com/repo"] != local {
+		t.Fatalf("expected file uri replace %q, got %q", local, loaded.Replace["https://example.com/repo"])
+	}
+}
+
+func TestLoadIgnoresLegacyTypeField(t *testing.T) {
+	root := t.TempDir()
+	configPath := filepath.Join(root, "skills.jsonc")
+	if err := os.WriteFile(configPath, []byte(`{"skills": [{"name": "legacy", "type": "git", "origin": "https://example.com/repo", "version": "v1.0.0"}]}`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	loaded, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(loaded.Skills) != 1 {
+		t.Fatalf("expected 1 skill, got %d", len(loaded.Skills))
+	}
+	if loaded.Skills[0].Origin != "https://example.com/repo" {
+		t.Fatalf("expected origin https://example.com/repo, got %q", loaded.Skills[0].Origin)
 	}
 }

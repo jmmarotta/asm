@@ -28,12 +28,11 @@ func Remove(names []string) (RemoveReport, error) {
 		}
 		removed = append(removed, SkillSummary{
 			Name:    skill.Name,
-			Type:    skill.Type,
 			Origin:  skill.Origin,
 			Version: skill.Version,
 			Subdir:  skill.Subdir,
 		})
-		if skill.Type == "git" {
+		if skill.Version != "" {
 			if !originSeen[skill.Origin] {
 				originSeen[skill.Origin] = true
 				originOrder = append(originOrder, skill.Origin)
@@ -89,7 +88,7 @@ func uniqueRemoveNames(names []string) []string {
 
 func originInUse(configValue manifest.Config, origin string) bool {
 	for _, skill := range configValue.Skills {
-		if skill.Type == "git" && skill.Origin == origin {
+		if skill.Version != "" && skill.Origin == origin {
 			return true
 		}
 	}

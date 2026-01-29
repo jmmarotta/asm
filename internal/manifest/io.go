@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/tidwall/jsonc"
+
+	"github.com/jmmarotta/agent_skills_manager/internal/source"
 )
 
 const (
@@ -237,14 +239,32 @@ func expandConfigPaths(config Config, root string) (Config, error) {
 	}
 
 	for index, skill := range config.Skills {
-		if skill.Type == "path" {
+		originValue, _, err := source.NormalizeFileOrigin(skill.Origin)
+		if err != nil {
+			return Config{}, fmt.Errorf("skills[%d]: %w", index, err)
+		}
+		skill.Origin = originValue
+		if err := source.ValidateOriginScheme(skill.Origin); err != nil {
+			return Config{}, fmt.Errorf("skills[%d]: %w", index, err)
+		}
+		if !source.IsRemoteOrigin(skill.Origin) {
 			skill.Origin = expandRelativePath(skill.Origin, root)
 		}
 		expanded.Skills[index] = skill
 	}
 
 	for origin, replace := range config.Replace {
-		expanded.Replace[origin] = expandRelativePath(replace, root)
+		replaceValue, _, err := source.NormalizeFileOrigin(replace)
+		if err != nil {
+			return Config{}, fmt.Errorf("replace[%q]: %w", origin, err)
+		}
+		if err := source.ValidateOriginScheme(replaceValue); err != nil {
+			return Config{}, fmt.Errorf("replace[%q]: %w", origin, err)
+		}
+		if source.IsRemoteOrigin(replaceValue) {
+			return Config{}, fmt.Errorf("replace[%q]: replace path must be a local path", origin)
+		}
+		expanded.Replace[origin] = expandRelativePath(replaceValue, root)
 	}
 
 	return expanded, nil
@@ -257,14 +277,32 @@ func normalizeConfigPaths(config Config, root string) (Config, error) {
 	}
 
 	for index, skill := range config.Skills {
-		if skill.Type == "path" {
+		originValue, _, err := source.NormalizeFileOrigin(skill.Origin)
+		if err != nil {
+			return Config{}, fmt.Errorf("skills[%d]: %w", index, err)
+		}
+		skill.Origin = originValue
+		if err := source.ValidateOriginScheme(skill.Origin); err != nil {
+			return Config{}, fmt.Errorf("skills[%d]: %w", index, err)
+		}
+		if !source.IsRemoteOrigin(skill.Origin) {
 			skill.Origin = collapseRelativePath(skill.Origin, root)
 		}
 		normalized.Skills[index] = skill
 	}
 
 	for origin, replace := range config.Replace {
-		normalized.Replace[origin] = collapseRelativePath(replace, root)
+		replaceValue, _, err := source.NormalizeFileOrigin(replace)
+		if err != nil {
+			return Config{}, fmt.Errorf("replace[%q]: %w", origin, err)
+		}
+		if err := source.ValidateOriginScheme(replaceValue); err != nil {
+			return Config{}, fmt.Errorf("replace[%q]: %w", origin, err)
+		}
+		if source.IsRemoteOrigin(replaceValue) {
+			return Config{}, fmt.Errorf("replace[%q]: replace path must be a local path", origin)
+		}
+		normalized.Replace[origin] = collapseRelativePath(replaceValue, root)
 	}
 
 	return normalized, nil

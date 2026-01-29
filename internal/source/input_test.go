@@ -92,3 +92,25 @@ func TestParseInputRejectsEscapingSubdir(t *testing.T) {
 		t.Fatalf("expected error for escaping subdir")
 	}
 }
+
+func TestParseInputFileURIConvertsToPath(t *testing.T) {
+	root := t.TempDir()
+	fileURI := "file://" + filepath.ToSlash(root)
+
+	input, err := ParseInput(fileURI, "")
+	if err != nil {
+		t.Fatalf("ParseInput: %v", err)
+	}
+	if input.Origin != root {
+		t.Fatalf("expected origin %q, got %q", root, input.Origin)
+	}
+	if !input.IsLocal {
+		t.Fatalf("expected local input")
+	}
+}
+
+func TestParseInputRejectsUnknownScheme(t *testing.T) {
+	if _, err := ParseInput("s3://bucket/repo", ""); err == nil {
+		t.Fatalf("expected error for unsupported scheme")
+	}
+}

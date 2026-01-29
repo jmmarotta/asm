@@ -26,7 +26,7 @@ func (config Config) ResolveSkillPaths(originPaths map[string]string) ([]SkillPa
 	paths := make([]SkillPath, 0, len(config.Skills))
 	for _, skill := range config.Skills {
 		base := skill.Origin
-		if skill.Type == "git" {
+		if skill.Version != "" {
 			resolved, ok := originPaths[skill.Origin]
 			if !ok || resolved == "" {
 				return nil, MissingOriginPathError{Origin: skill.Origin, Skill: skill.Name}

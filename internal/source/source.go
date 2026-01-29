@@ -1,6 +1,7 @@
 package source
 
 import (
+	"fmt"
 	"net/url"
 	"path/filepath"
 	"regexp"
@@ -9,10 +10,62 @@ import (
 
 var scpPattern = regexp.MustCompile(`^[^@]+@[^:]+:`)
 var githubTreePattern = regexp.MustCompile(`^https?://github.com/[^/]+/[^/]+/tree/`)
+var allowedRemoteSchemes = map[string]bool{
+	"git":   true,
+	"http":  true,
+	"https": true,
+	"ssh":   true,
+}
+
+func schemeForOrigin(origin string) (string, bool) {
+	index := strings.Index(origin, "://")
+	if index <= 0 {
+		return "", false
+	}
+	return strings.ToLower(origin[:index]), true
+}
+
+func NormalizeFileOrigin(origin string) (string, bool, error) {
+	scheme, ok := schemeForOrigin(origin)
+	if !ok || scheme != "file" {
+		return origin, false, nil
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return "", false, fmt.Errorf("invalid file origin %q: %w", origin, err)
+	}
+	if parsed.Host != "" && parsed.Host != "localhost" {
+		return "", false, fmt.Errorf("unsupported file origin host %q", parsed.Host)
+	}
+	pathValue, err := url.PathUnescape(parsed.Path)
+	if err != nil {
+		return "", false, fmt.Errorf("invalid file origin %q: %w", origin, err)
+	}
+	if pathValue == "" {
+		return "", false, fmt.Errorf("invalid file origin %q", origin)
+	}
+
+	return filepath.Clean(pathValue), true, nil
+}
+
+func ValidateOriginScheme(origin string) error {
+	scheme, ok := schemeForOrigin(origin)
+	if !ok {
+		return nil
+	}
+	if scheme == "file" {
+		return nil
+	}
+	if allowedRemoteSchemes[scheme] {
+		return nil
+	}
+	return fmt.Errorf("unsupported origin scheme %q", scheme)
+}
 
 func IsRemoteOrigin(origin string) bool {
-	if strings.Contains(origin, "://") {
-		return true
+	if scheme, ok := schemeForOrigin(origin); ok {
+		return allowedRemoteSchemes[scheme]
 	}
 	return scpPattern.MatchString(origin)
 }

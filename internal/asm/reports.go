@@ -11,7 +11,6 @@ type InstallReport struct {
 
 type SkillSummary struct {
 	Name    string
-	Type    string
 	Origin  string
 	Version string
 	Subdir  string
@@ -24,7 +23,6 @@ type ListReport struct {
 
 type ShowReport struct {
 	Name    string `json:"name"`
-	Type    string `json:"type"`
 	Origin  string `json:"origin"`
 	Subdir  string `json:"subdir,omitempty"`
 	Version string `json:"version,omitempty"`

@@ -11,7 +11,6 @@ import (
 )
 
 type addResolution struct {
-	Type        string
 	Origin      string
 	RepoPath    string
 	Version     string
@@ -60,14 +59,13 @@ func Add(input string, pathFlag string) (InstallReport, error) {
 	}
 	if err := state.Config.UpsertDiscoveredSkills(discovered, manifest.UpsertOptions{
 		Origin:  resolution.Origin,
-		Type:    resolution.Type,
 		Version: resolution.Version,
 		Author:  author,
 	}); err != nil {
 		return InstallReport{}, err
 	}
 
-	if resolution.Type == "git" {
+	if resolution.Version != "" {
 		if state.Lock == nil {
 			state.Lock = map[manifest.LockKey]string{}
 		}
@@ -109,7 +107,6 @@ func parseAddInput(input string, pathFlag string) (source.Input, error) {
 			}
 
 			return source.Input{
-				Type:    "git",
 				Origin:  source.NormalizeOrigin(tree.Origin),
 				Ref:     tree.Ref,
 				Subdir:  tree.Subdir,
@@ -142,7 +139,6 @@ func resolveAddInput(state manifest.State, inputSpec source.Input) (addResolutio
 					return addResolution{}, fmt.Errorf("resolve ref %q: %w", inputSpec.Ref, err)
 				}
 				return addResolution{
-					Type:        "git",
 					Origin:      origin,
 					RepoPath:    inputSpec.RepoRoot,
 					Version:     resolved.Version,
@@ -153,7 +149,6 @@ func resolveAddInput(state manifest.State, inputSpec source.Input) (addResolutio
 		}
 
 		return addResolution{
-			Type:     "path",
 			Origin:   inputSpec.Origin,
 			RepoPath: inputSpec.Origin,
 		}, nil
@@ -169,7 +164,6 @@ func resolveAddInput(state manifest.State, inputSpec source.Input) (addResolutio
 	}
 
 	return addResolution{
-		Type:     "git",
 		Origin:   inputSpec.Origin,
 		RepoPath: repoPath,
 		Version:  resolved.Version,
@@ -178,7 +172,7 @@ func resolveAddInput(state manifest.State, inputSpec source.Input) (addResolutio
 }
 
 func resolveAuthor(inputSpec source.Input, resolution addResolution) string {
-	if resolution.Type == "git" {
+	if resolution.Version != "" {
 		return source.AuthorForRemoteOrigin(resolution.Origin)
 	}
 	if inputSpec.IsLocal {

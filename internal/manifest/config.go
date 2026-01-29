@@ -7,6 +7,8 @@ import (
 
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
+
+	"github.com/jmmarotta/agent_skills_manager/internal/source"
 )
 
 type Config struct {
@@ -16,7 +18,6 @@ type Config struct {
 
 type Skill struct {
 	Name    string `json:"name"`
-	Type    string `json:"type"`
 	Origin  string `json:"origin"`
 	Subdir  string `json:"subdir,omitempty"`
 	Version string `json:"version,omitempty"`
@@ -49,7 +50,7 @@ func (config *Config) Validate() error {
 			return fmt.Errorf("skills[%d]: origin %q subdir %q already used by skills[%d]", index, skill.Origin, normalizedSubdir, prior)
 		}
 		identities[identity] = index
-		if skill.Type != "git" {
+		if skill.Version == "" {
 			continue
 		}
 		if existing, ok := versions[skill.Origin]; ok && existing != skill.Version {
@@ -94,25 +95,23 @@ func (skill Skill) Validate(index int) error {
 	if skill.Name == "" {
 		return fmt.Errorf("skills[%d]: missing name", index)
 	}
-	if skill.Type == "" {
-		return fmt.Errorf("skills[%d]: missing type", index)
-	}
 	if skill.Origin == "" {
 		return fmt.Errorf("skills[%d]: missing origin", index)
 	}
-	if skill.Type != "git" && skill.Type != "path" {
-		return fmt.Errorf("skills[%d]: invalid type %q", index, skill.Type)
+	if err := source.ValidateOriginScheme(skill.Origin); err != nil {
+		return fmt.Errorf("skills[%d]: %w", index, err)
 	}
-	if skill.Type == "git" && skill.Version == "" {
+	isRemote := source.IsRemoteOrigin(skill.Origin)
+	if isRemote && skill.Version == "" {
 		return fmt.Errorf("skills[%d]: missing version", index)
 	}
-	if skill.Type == "git" && skill.Version != "" {
+	if !isRemote && skill.Version != "" {
+		return fmt.Errorf("skills[%d]: local origins cannot set version", index)
+	}
+	if skill.Version != "" {
 		if !semver.IsValid(skill.Version) && !module.IsPseudoVersion(skill.Version) {
 			return fmt.Errorf("skills[%d]: invalid version %q", index, skill.Version)
 		}
-	}
-	if skill.Type == "path" && skill.Version != "" {
-		return fmt.Errorf("skills[%d]: path skills cannot set version", index)
 	}
 	return nil
 }

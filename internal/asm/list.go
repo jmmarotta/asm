@@ -16,7 +16,6 @@ func List() (ListReport, error) {
 	for _, skill := range state.Config.Skills {
 		report.Skills = append(report.Skills, SkillSummary{
 			Name:    skill.Name,
-			Type:    skill.Type,
 			Origin:  skill.Origin,
 			Version: skill.Version,
 			Subdir:  skill.Subdir,
