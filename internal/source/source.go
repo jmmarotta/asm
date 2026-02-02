@@ -94,6 +94,24 @@ func NormalizeOrigin(origin string) string {
 	normalized = strings.TrimSuffix(normalized, "/")
 
 	if IsRemoteOrigin(origin) {
+		if scheme, ok := schemeForOrigin(normalized); ok {
+			parsed, err := url.Parse(normalized)
+			if err == nil && parsed != nil {
+				if parsed.User != nil {
+					if scheme == "ssh" {
+						username := parsed.User.Username()
+						if username != "" {
+							parsed.User = url.User(username)
+						} else {
+							parsed.User = nil
+						}
+					} else {
+						parsed.User = nil
+					}
+					normalized = parsed.String()
+				}
+			}
+		}
 		return normalized
 	}
 

@@ -63,6 +63,9 @@ func TestParseInputRemote(t *testing.T) {
 	if input.Origin != "https://github.com/org/repo" {
 		t.Fatalf("expected normalized origin, got %q", input.Origin)
 	}
+	if input.RawOrigin != "https://github.com/org/repo.git" {
+		t.Fatalf("expected raw origin, got %q", input.RawOrigin)
+	}
 	if input.Ref != "main" {
 		t.Fatalf("expected ref main, got %q", input.Ref)
 	}

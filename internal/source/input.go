@@ -9,6 +9,7 @@ import (
 
 type Input struct {
 	Origin    string
+	RawOrigin string
 	Ref       string
 	Subdir    string
 	LocalPath string
@@ -75,6 +76,7 @@ func parseLocalInput(input string, pathFlag string) (Input, error) {
 
 	return Input{
 		Origin:    origin,
+		RawOrigin: origin,
 		Ref:       "",
 		Subdir:    subdir,
 		LocalPath: absolute,
@@ -85,6 +87,7 @@ func parseLocalInput(input string, pathFlag string) (Input, error) {
 
 func parseRemoteInput(input string, pathFlag string) (Input, error) {
 	origin, ref := ParseOriginRef(input)
+	rawOrigin := origin
 	origin = NormalizeOrigin(origin)
 
 	subdir, err := cleanSubdir(pathFlag)
@@ -93,10 +96,11 @@ func parseRemoteInput(input string, pathFlag string) (Input, error) {
 	}
 
 	return Input{
-		Origin:  origin,
-		Ref:     ref,
-		Subdir:  subdir,
-		IsLocal: false,
+		Origin:    origin,
+		RawOrigin: rawOrigin,
+		Ref:       ref,
+		Subdir:    subdir,
+		IsLocal:   false,
 	}, nil
 }
 

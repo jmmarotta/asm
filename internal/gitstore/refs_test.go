@@ -48,6 +48,29 @@ func TestListRemoteRefs(t *testing.T) {
 	}
 }
 
+func TestRemoteHeadHash(t *testing.T) {
+	repoDir := t.TempDir()
+	repo := initRepo(t, repoDir)
+
+	writeFile(t, repoDir, "README.md", "# repo")
+	wt, err := repo.Worktree()
+	if err != nil {
+		t.Fatalf("worktree: %v", err)
+	}
+	if _, err := wt.Add("README.md"); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	commitHash := commit(t, repo, wt, "init")
+
+	headHash, err := RemoteHeadHash(repoDir)
+	if err != nil {
+		t.Fatalf("RemoteHeadHash: %v", err)
+	}
+	if headHash != commitHash.String() {
+		t.Fatalf("expected head %s, got %s", commitHash.String(), headHash)
+	}
+}
+
 func initRepo(t *testing.T, dir string) *git.Repository {
 	repo, err := git.PlainInit(dir, false)
 	if err != nil {

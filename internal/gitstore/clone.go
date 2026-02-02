@@ -21,8 +21,13 @@ func EnsureRepo(path string, origin string) error {
 		return err
 	}
 
+	access, err := ResolveRemoteAccess(origin)
+	if err != nil {
+		return err
+	}
 	options := &git.CloneOptions{
-		URL:   origin,
+		URL:   access.URL,
+		Auth:  access.Auth,
 		Tags:  git.AllTags,
 		Depth: 0,
 	}
@@ -42,9 +47,15 @@ func UpdateRepo(path string, origin string) error {
 	}
 
 	debug.Logf("fetch repo path=%s origin=%s", path, debug.SanitizeOrigin(origin))
+	access, err := ResolveRemoteAccess(origin)
+	if err != nil {
+		return err
+	}
 	fetchOptions := &git.FetchOptions{
 		RemoteName: "origin",
+		RemoteURL:  access.URL,
 		Tags:       git.AllTags,
+		Auth:       access.Auth,
 		RefSpecs: []config.RefSpec{
 			"+refs/heads/*:refs/remotes/origin/*",
 			"+refs/tags/*:refs/tags/*",

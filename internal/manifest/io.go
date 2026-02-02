@@ -247,6 +247,9 @@ func expandConfigPaths(config Config, root string) (Config, error) {
 		if err := source.ValidateOriginScheme(skill.Origin); err != nil {
 			return Config{}, fmt.Errorf("skills[%d]: %w", index, err)
 		}
+		if source.IsRemoteOrigin(skill.Origin) {
+			skill.Origin = source.NormalizeOrigin(skill.Origin)
+		}
 		if !source.IsRemoteOrigin(skill.Origin) {
 			skill.Origin = expandRelativePath(skill.Origin, root)
 		}
@@ -254,6 +257,10 @@ func expandConfigPaths(config Config, root string) (Config, error) {
 	}
 
 	for origin, replace := range config.Replace {
+		normalizedOrigin := origin
+		if source.IsRemoteOrigin(normalizedOrigin) {
+			normalizedOrigin = source.NormalizeOrigin(normalizedOrigin)
+		}
 		replaceValue, _, err := source.NormalizeFileOrigin(replace)
 		if err != nil {
 			return Config{}, fmt.Errorf("replace[%q]: %w", origin, err)
@@ -264,7 +271,11 @@ func expandConfigPaths(config Config, root string) (Config, error) {
 		if source.IsRemoteOrigin(replaceValue) {
 			return Config{}, fmt.Errorf("replace[%q]: replace path must be a local path", origin)
 		}
-		expanded.Replace[origin] = expandRelativePath(replaceValue, root)
+		resolved := expandRelativePath(replaceValue, root)
+		if existing, ok := expanded.Replace[normalizedOrigin]; ok && existing != resolved {
+			return Config{}, fmt.Errorf("replace[%q]: conflicts with replace[%q]", origin, normalizedOrigin)
+		}
+		expanded.Replace[normalizedOrigin] = resolved
 	}
 
 	return expanded, nil
@@ -285,6 +296,9 @@ func normalizeConfigPaths(config Config, root string) (Config, error) {
 		if err := source.ValidateOriginScheme(skill.Origin); err != nil {
 			return Config{}, fmt.Errorf("skills[%d]: %w", index, err)
 		}
+		if source.IsRemoteOrigin(skill.Origin) {
+			skill.Origin = source.NormalizeOrigin(skill.Origin)
+		}
 		if !source.IsRemoteOrigin(skill.Origin) {
 			skill.Origin = collapseRelativePath(skill.Origin, root)
 		}
@@ -292,6 +306,10 @@ func normalizeConfigPaths(config Config, root string) (Config, error) {
 	}
 
 	for origin, replace := range config.Replace {
+		normalizedOrigin := origin
+		if source.IsRemoteOrigin(normalizedOrigin) {
+			normalizedOrigin = source.NormalizeOrigin(normalizedOrigin)
+		}
 		replaceValue, _, err := source.NormalizeFileOrigin(replace)
 		if err != nil {
 			return Config{}, fmt.Errorf("replace[%q]: %w", origin, err)
@@ -302,7 +320,11 @@ func normalizeConfigPaths(config Config, root string) (Config, error) {
 		if source.IsRemoteOrigin(replaceValue) {
 			return Config{}, fmt.Errorf("replace[%q]: replace path must be a local path", origin)
 		}
-		normalized.Replace[origin] = collapseRelativePath(replaceValue, root)
+		resolved := collapseRelativePath(replaceValue, root)
+		if existing, ok := normalized.Replace[normalizedOrigin]; ok && existing != resolved {
+			return Config{}, fmt.Errorf("replace[%q]: conflicts with replace[%q]", origin, normalizedOrigin)
+		}
+		normalized.Replace[normalizedOrigin] = resolved
 	}
 
 	return normalized, nil

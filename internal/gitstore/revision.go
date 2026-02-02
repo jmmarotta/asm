@@ -60,6 +60,29 @@ func ResolveForRef(repo *git.Repository, ref string) (Resolved, error) {
 	return resolveFromCommit(repo, commit)
 }
 
+func ResolveForRemoteHeadAt(repoPath string, origin string) (Resolved, error) {
+	if origin == "" {
+		return Resolved{}, fmt.Errorf("origin is required")
+	}
+
+	repo, err := openRepo(repoPath)
+	if err != nil {
+		return Resolved{}, err
+	}
+
+	headHash, err := RemoteHeadHash(origin)
+	if err != nil {
+		return Resolved{}, err
+	}
+
+	commit, err := repo.CommitObject(plumbing.NewHash(headHash))
+	if err != nil {
+		return Resolved{}, fmt.Errorf("load remote head commit %s: %w", headHash, err)
+	}
+
+	return resolveFromCommit(repo, commit)
+}
+
 func ResolveForVersion(repo *git.Repository, version string) (string, error) {
 	debug.Logf("resolve version=%q", version)
 	if module.IsPseudoVersion(version) {
@@ -149,20 +172,21 @@ func commitForRef(repo *git.Repository, ref string) (*object.Commit, error) {
 		return commitForPrefix(repo, ref)
 	}
 
-	branch := plumbing.NewBranchReferenceName(ref)
-	if reference, err := repo.Reference(branch, true); err == nil {
-		commit, err := repo.CommitObject(reference.Hash())
-		if err != nil {
-			return nil, fmt.Errorf("load commit for branch %s: %w", branch, err)
-		}
-		return commit, nil
-	}
-
+	// Prefer remote-tracking branches for bare names; local branches can be stale after detached checkouts.
 	remoteBranch := plumbing.NewRemoteReferenceName("origin", ref)
 	if reference, err := repo.Reference(remoteBranch, true); err == nil {
 		commit, err := repo.CommitObject(reference.Hash())
 		if err != nil {
 			return nil, fmt.Errorf("load commit for remote branch %s: %w", remoteBranch, err)
+		}
+		return commit, nil
+	}
+
+	branch := plumbing.NewBranchReferenceName(ref)
+	if reference, err := repo.Reference(branch, true); err == nil {
+		commit, err := repo.CommitObject(reference.Hash())
+		if err != nil {
+			return nil, fmt.Errorf("load commit for branch %s: %w", branch, err)
 		}
 		return commit, nil
 	}
