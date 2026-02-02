@@ -1,6 +1,8 @@
 # asm
 
-Manage skill dependencies in a repository (Go/Bun-style).
+Manage repo-local skill dependencies with a manifest + lockfile.
+
+A skill is a directory containing `SKILL.md`. Repos can expose a single skill at the root or multiple skills under `skills/` or `plugins/`.
 
 ## Install
 ```sh
@@ -37,11 +39,28 @@ GitHub tree URLs are supported:
 asm add https://github.com/org/repo/tree/main/plugins/foo
 ```
 
+## Init behavior
+- Creates `skills.jsonc` if it doesn't exist.
+- Creates `.asm/` and `skills/` directories.
+- Appends `.asm/` and `skills/` to `.gitignore`.
+
+## Skill discovery
+- `asm add` scans for `SKILL.md` files.
+- If the repo root is a skill directory, it adds that single skill.
+- If the repo contains `skills/` or `plugins/` and every child has `SKILL.md`, it adds all of them.
+- If multiple skill roots are found, use `--path` to target a subdirectory.
+- `--path` can point at a single skill directory or a multi-skill root.
+
 ## Files
 - `skills.jsonc` (manifest; fallback `skills.json`)
-- `skills-lock.json` (resolved revisions; go.sum analogue)
+- `skills-lock.json` (resolved revisions; lockfile)
 - `.asm/` (store + cache)
 - `skills/` (installed symlinks; gitignored)
+
+## Reproducible installs
+- Commit `skills.jsonc` and `skills-lock.json`.
+- `.asm/` and `skills/` are generated and should stay gitignored.
+- `asm install` uses the lockfile; `asm update` refreshes it.
 
 ## Manifest
 ```jsonc
@@ -61,7 +80,7 @@ asm add https://github.com/org/repo/tree/main/plugins/foo
 ```
 
 Notes:
-- `version` is required for git sources (semver tag or Go pseudo-version).
+- `version` is required for git sources (semver tag or pseudo-version like `v0.0.0-YYYYMMDDHHMMSS-abcdef123456`).
 - Omit `version` for local path sources; `origin` is the directory (non-portable).
 - `replace` is best-effort: if the path is missing, installs fall back to remote.
 
@@ -83,8 +102,19 @@ Aliases: `add` = `a`, `install` = `i`, `remove` = `rm`/`uninstall`, `update` = `
 - `asm install` prunes unmanaged symlinks under `skills/`.
 
 ## Private repositories
-Auth is not explicitly configured for git fetches yet; public repos work by default.
-Use local paths or `replace` overrides for private repositories until auth support is added.
+asm uses go-git and picks up auth from common sources without storing credentials in `skills.jsonc`.
+
+HTTPS:
+- GitHub tokens: `ASM_GITHUB_TOKEN`, `GITHUB_TOKEN`, or `GH_TOKEN`
+- Generic tokens: `ASM_GIT_TOKEN` (optionally `ASM_GIT_USERNAME`)
+- `.netrc` entries for the host
+
+SSH:
+- Uses your SSH agent (`SSH_AUTH_SOCK`) and `~/.ssh/known_hosts`
+- Optional escape hatch: set `ASM_SSH_INSECURE=1` to skip host key verification
+
+Git config rewriting:
+- Global `url.<base>.insteadOf` rules are honored, so `https://github.com/...` can transparently use SSH.
 
 ## Development
 See `docs/development.md` for build/test commands and contributor notes.
