@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	gitconfig "github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
 	"github.com/jmmarotta/agent_skills_manager/internal/manifest"
@@ -143,6 +144,61 @@ func TestAddGitRepoReusesIdentityAndUpdatesVersion(t *testing.T) {
 		}
 	}
 	if err := assertNames(loaded.Skills, "alpha", "beta"); err != nil {
+		t.Fatalf("names: %v", err)
+	}
+}
+
+func TestAddGitHubTreeURLRefreshesStoreCheckout(t *testing.T) {
+	originDir := t.TempDir()
+	repo, err := git.PlainInit(originDir, false)
+	if err != nil {
+		t.Fatalf("init repo: %v", err)
+	}
+
+	wt, err := repo.Worktree()
+	if err != nil {
+		t.Fatalf("worktree: %v", err)
+	}
+
+	touchSkill(t, filepath.Join(originDir, "skills", "alpha"))
+	commitPaths(t, repo, "init", time.Now().Add(-time.Minute), filepath.Join("skills", "alpha", "SKILL.md"))
+	if err := wt.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.NewBranchReferenceName("main"),
+		Create: true,
+	}); err != nil {
+		t.Fatalf("checkout main: %v", err)
+	}
+
+	configPath := filepath.Join(t.TempDir(), "gitconfig")
+	config := fmt.Sprintf("[url \"%s\"]\n\tinsteadOf = https://github.com/acme/skills\n", originDir)
+	if err := os.WriteFile(configPath, []byte(config), 0o644); err != nil {
+		t.Fatalf("write gitconfig: %v", err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", configPath)
+
+	repoRoot := t.TempDir()
+	setWorkingDir(t, repoRoot)
+
+	cmd, _, _ := newTestCommand()
+	cmd.SetArgs([]string{"add", "https://github.com/acme/skills/tree/main/skills"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("add skills: %v", err)
+	}
+
+	touchSkill(t, filepath.Join(originDir, "skills", "agent-protocol"))
+	commitPaths(t, repo, "add agent-protocol", time.Now(), filepath.Join("skills", "agent-protocol", "SKILL.md"))
+
+	cmd, _, _ = newTestCommand()
+	cmd.SetArgs([]string{"add", "https://github.com/acme/skills/tree/main/skills/agent-protocol"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("add agent-protocol: %v", err)
+	}
+
+	loaded, err := manifest.Load(filepath.Join(repoRoot, "skills.jsonc"))
+	if err != nil {
+		t.Fatalf("load manifest: %v", err)
+	}
+	if err := assertNames(loaded.Skills, "alpha", "agent-protocol"); err != nil {
 		t.Fatalf("names: %v", err)
 	}
 }

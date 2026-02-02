@@ -36,6 +36,11 @@ func Add(input string, pathFlag string) (InstallReport, error) {
 	if err != nil {
 		return InstallReport{}, fmt.Errorf("resolve add input: %w", err)
 	}
+	if !inputSpec.IsLocal && resolution.Rev != "" {
+		if err := gitstore.CheckoutRevision(resolution.RepoPath, resolution.Rev); err != nil {
+			return InstallReport{}, fmt.Errorf("checkout repo: %w", err)
+		}
+	}
 
 	skills, err := source.DiscoverSkills(resolution.RepoPath, inputSpec.Subdir)
 	if err != nil {
@@ -107,10 +112,11 @@ func parseAddInput(input string, pathFlag string) (source.Input, error) {
 			}
 
 			return source.Input{
-				Origin:  source.NormalizeOrigin(tree.Origin),
-				Ref:     tree.Ref,
-				Subdir:  tree.Subdir,
-				IsLocal: false,
+				Origin:    source.NormalizeOrigin(tree.Origin),
+				RawOrigin: tree.Origin,
+				Ref:       tree.Ref,
+				Subdir:    tree.Subdir,
+				IsLocal:   false,
 			}, nil
 		}
 	}
@@ -155,11 +161,18 @@ func resolveAddInput(state manifest.State, inputSpec source.Input) (addResolutio
 	}
 
 	repoPath := gitstore.RepoPath(state.Paths.StoreDir, inputSpec.Origin)
-	if err := gitstore.EnsureRepo(repoPath, inputSpec.Origin); err != nil {
+	origin := inputSpec.Origin
+	if inputSpec.RawOrigin != "" {
+		origin = inputSpec.RawOrigin
+	}
+	if err := gitstore.EnsureRepo(repoPath, origin); err != nil {
 		return addResolution{}, err
 	}
-	resolved, err := gitstore.ResolveForRefAt(repoPath, inputSpec.Ref)
+	resolved, err := resolveRemoteRef(repoPath, origin, inputSpec.Ref)
 	if err != nil {
+		if inputSpec.Ref == "" {
+			return addResolution{}, fmt.Errorf("resolve default ref: %w", err)
+		}
 		return addResolution{}, fmt.Errorf("resolve ref %q: %w", inputSpec.Ref, err)
 	}
 
@@ -179,4 +192,15 @@ func resolveAuthor(inputSpec source.Input, resolution addResolution) string {
 		return source.AuthorForLocalPath(inputSpec.Origin)
 	}
 	return source.AuthorForRemoteOrigin(resolution.Origin)
+}
+
+func resolveRemoteRef(repoPath string, origin string, ref string) (gitstore.Resolved, error) {
+	if ref == "" {
+		resolved, err := gitstore.ResolveForRemoteHeadAt(repoPath, origin)
+		if err == nil {
+			return resolved, nil
+		}
+	}
+
+	return gitstore.ResolveForRefAt(repoPath, ref)
 }
