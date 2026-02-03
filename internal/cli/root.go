@@ -36,6 +36,7 @@ func newRootCommand() *cobra.Command {
 	cmd.PersistentFlags().Bool(debugFlag, false, "Enable debug logging")
 
 	cmd.AddCommand(newLsCommand())
+	cmd.AddCommand(newFindCommand())
 	cmd.AddCommand(newShowCommand())
 	cmd.AddCommand(newAddCommand())
 	cmd.AddCommand(newUpdateCommand())

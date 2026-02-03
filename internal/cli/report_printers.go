@@ -10,6 +10,8 @@ import (
 	"github.com/jmmarotta/agent_skills_manager/internal/asm"
 )
 
+const findResultsLimit = 6
+
 func printInstallReport(report asm.InstallReport, out io.Writer, errOut io.Writer) {
 	for _, warning := range report.Warnings {
 		if warning.Target != "" {
@@ -47,6 +49,34 @@ func printListReport(report asm.ListReport, out io.Writer) error {
 	}
 
 	return writer.Flush()
+}
+
+func printFindReport(report asm.FindReport, out io.Writer) {
+	if len(report.Skills) == 0 {
+		fmt.Fprintf(out, "No skills found for %q.\n", report.Query)
+		return
+	}
+
+	fmt.Fprintln(out, "Install with asm add https://github.com/<owner>/<repo> --path skills/<skill>")
+	fmt.Fprintln(out)
+
+	skills := report.Skills
+	if len(skills) > findResultsLimit {
+		skills = skills[:findResultsLimit]
+	}
+
+	for _, skill := range skills {
+		skillID := skill.SkillID
+		if skillID == "" {
+			skillID = skill.Name
+		}
+		if skill.Source == "" || skillID == "" {
+			continue
+		}
+		fmt.Fprintf(out, "asm add https://github.com/%s --path skills/%s\n", skill.Source, skillID)
+		fmt.Fprintf(out, "  https://skills.sh/%s/%s\n", skill.Source, skillID)
+		fmt.Fprintln(out)
+	}
 }
 
 func printShowReport(report asm.ShowReport, out io.Writer) error {

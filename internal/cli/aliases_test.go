@@ -10,6 +10,7 @@ func TestCommandAliases(t *testing.T) {
 		expected string
 	}{
 		{alias: "a", expected: "add"},
+		{alias: "f", expected: "find"},
 		{alias: "i", expected: "install"},
 		{alias: "rm", expected: "remove"},
 		{alias: "uninstall", expected: "remove"},

@@ -32,6 +32,9 @@ asm install
 # inspect configured skills
 asm ls
 asm show foo
+
+# find skills
+asm find react testing
 ```
 
 GitHub tree URLs are supported:
@@ -90,10 +93,11 @@ Notes:
 - `asm update [name]`
 - `asm remove <name> [<name>...]`
 - `asm install`
+- `asm find <query...>`
 - `asm ls`
 - `asm show <name>`
 
-Aliases: `add` = `a`, `install` = `i`, `remove` = `rm`/`uninstall`, `update` = `up`.
+Aliases: `add` = `a`, `find` = `f`, `install` = `i`, `remove` = `rm`/`uninstall`, `update` = `up`.
 
 ## Install behavior
 - Skills are symlinked to `skills/<name>`.

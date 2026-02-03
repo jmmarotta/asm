@@ -21,6 +21,18 @@ type ListReport struct {
 	NoSkills bool
 }
 
+type FindSkill struct {
+	Source   string
+	SkillID  string
+	Name     string
+	Installs int
+}
+
+type FindReport struct {
+	Query  string
+	Skills []FindSkill
+}
+
 type ShowReport struct {
 	Name    string `json:"name"`
 	Origin  string `json:"origin"`
