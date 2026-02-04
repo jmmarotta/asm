@@ -21,6 +21,12 @@ type ListReport struct {
 	NoSkills bool
 }
 
+type IndexReport struct {
+	OutputPath string
+	SkillCount int
+	Warnings   []string
+}
+
 type FindSkill struct {
 	Source   string
 	SkillID  string

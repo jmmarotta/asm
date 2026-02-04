@@ -51,6 +51,17 @@ func printListReport(report asm.ListReport, out io.Writer) error {
 	return writer.Flush()
 }
 
+func printIndexReport(report asm.IndexReport, out io.Writer, errOut io.Writer) {
+	for _, warning := range report.Warnings {
+		fmt.Fprintf(errOut, "warning: %s\n", warning)
+	}
+	if report.SkillCount == 0 {
+		fmt.Fprintf(out, "Wrote %s (no skills)\n", report.OutputPath)
+		return
+	}
+	fmt.Fprintf(out, "Wrote %s (%d skills)\n", report.OutputPath, report.SkillCount)
+}
+
 func printFindReport(report asm.FindReport, out io.Writer) {
 	if len(report.Skills) == 0 {
 		fmt.Fprintf(out, "No skills found for %q.\n", report.Query)
