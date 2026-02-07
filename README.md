@@ -63,7 +63,9 @@ asm add https://github.com/org/repo/tree/main/plugins/foo
 ## Reproducible installs
 - Commit `skills.jsonc` and `skills-lock.json`.
 - `.asm/` and `skills/` are generated and should stay gitignored.
-- `asm install` uses the lockfile; `asm update` refreshes it.
+- `asm install` uses the lockfile.
+- `asm update` advances pseudo-version skills to latest HEAD and refreshes the lockfile.
+- Semver-tagged skills stay pinned by default; target them explicitly to unpin.
 
 ## Manifest
 ```jsonc
@@ -90,7 +92,7 @@ Notes:
 ## Commands
 - `asm init [--cwd path]`
 - `asm add <path-or-url> [--path subdir]`
-- `asm update [name]`
+- `asm update [name|origin] [--path subdir]`
 - `asm remove <name> [<name>...]`
 - `asm install`
 - `asm find <query...>`

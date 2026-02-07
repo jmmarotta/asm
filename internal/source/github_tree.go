@@ -44,6 +44,25 @@ func GitHubTreeOrigin(raw string) (string, bool, error) {
 	return origin, true, nil
 }
 
+func ParseGitHubTreeURLLoose(raw string) (GitHubTreeSpec, bool, error) {
+	origin, treeSegments, ok, err := parseGitHubTreeSegments(raw)
+	if err != nil || !ok {
+		return GitHubTreeSpec{}, ok, err
+	}
+
+	if len(treeSegments) == 0 {
+		return GitHubTreeSpec{}, true, fmt.Errorf("github tree url missing ref")
+	}
+
+	ref := treeSegments[0]
+	subdir := ""
+	if len(treeSegments) > 1 {
+		subdir = path.Join(treeSegments[1:]...)
+	}
+
+	return GitHubTreeSpec{Origin: origin, Ref: ref, Subdir: subdir}, true, nil
+}
+
 func parseGitHubTreeSegments(raw string) (string, []string, bool, error) {
 	parsed, err := url.Parse(raw)
 	if err != nil {

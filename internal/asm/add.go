@@ -101,12 +101,7 @@ func parseAddInput(input string, pathFlag string) (source.Input, error) {
 			return source.Input{}, fmt.Errorf("parse github tree origin: %w", err)
 		}
 		if ok {
-			refs, err := gitstore.ListRemoteRefs(origin)
-			if err != nil {
-				return source.Input{}, err
-			}
-
-			tree, _, err := source.ParseGitHubTreeURL(input, refs.All)
+			tree, err := resolveGitHubTreeInput(input, origin)
 			if err != nil {
 				return source.Input{}, fmt.Errorf("unable to parse github tree url; use origin@ref --path instead: %w", err)
 			}
@@ -122,6 +117,29 @@ func parseAddInput(input string, pathFlag string) (source.Input, error) {
 	}
 
 	return source.ParseInput(input, pathFlag)
+}
+
+func resolveGitHubTreeInput(raw string, origin string) (source.GitHubTreeSpec, error) {
+	refs, refErr := gitstore.ListRemoteRefs(origin)
+	if refErr == nil {
+		tree, ok, parseErr := source.ParseGitHubTreeURL(raw, refs.All)
+		if parseErr == nil && ok {
+			return tree, nil
+		}
+	}
+
+	tree, ok, fallbackErr := source.ParseGitHubTreeURLLoose(raw)
+	if fallbackErr == nil && ok {
+		return tree, nil
+	}
+
+	if refErr != nil {
+		return source.GitHubTreeSpec{}, fmt.Errorf("list remote refs: %w", refErr)
+	}
+	if fallbackErr != nil {
+		return source.GitHubTreeSpec{}, fallbackErr
+	}
+	return source.GitHubTreeSpec{}, fmt.Errorf("unable to resolve ref from github tree url")
 }
 
 func resolveAddInput(state manifest.State, inputSpec source.Input) (addResolution, error) {

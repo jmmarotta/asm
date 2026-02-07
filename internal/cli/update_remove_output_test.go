@@ -12,7 +12,7 @@ import (
 	"github.com/jmmarotta/agent_skills_manager/internal/manifest"
 )
 
-func TestUpdateOutputIncludesOrigins(t *testing.T) {
+func TestUpdateOutputSkipsPinnedSemverByDefault(t *testing.T) {
 	repo := t.TempDir()
 	setWorkingDir(t, repo)
 
@@ -40,7 +40,7 @@ func TestUpdateOutputIncludesOrigins(t *testing.T) {
 		t.Fatalf("unexpected stderr: %q", stderr.String())
 	}
 
-	expected := fmt.Sprintf("Installed: 1, Pruned: 0, Warnings: 0\nUpdated origins: %s\n", origin)
+	expected := "Installed: 1, Pruned: 0, Warnings: 0\n"
 	if stdout.String() != expected {
 		t.Fatalf("unexpected stdout:\n%s", stdout.String())
 	}
