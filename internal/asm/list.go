@@ -12,8 +12,9 @@ func List() (ListReport, error) {
 		return ListReport{NoSkills: true}, nil
 	}
 
-	report := ListReport{Skills: make([]SkillSummary, 0, len(state.Config.Skills))}
-	for _, skill := range state.Config.Skills {
+	orderedSkills := manifest.SortedSkills(state.Config.Skills)
+	report := ListReport{Skills: make([]SkillSummary, 0, len(orderedSkills))}
+	for _, skill := range orderedSkills {
 		report.Skills = append(report.Skills, SkillSummary{
 			Name:    skill.Name,
 			Origin:  skill.Origin,

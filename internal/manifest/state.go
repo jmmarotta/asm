@@ -97,5 +97,5 @@ func SaveState(state State) error {
 		return nil
 	}
 
-	return SaveLock(state.LockPath, state.Lock)
+	return SaveLockWithSkills(state.LockPath, state.Lock, state.Config.Skills)
 }

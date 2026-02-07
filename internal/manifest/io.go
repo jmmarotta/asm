@@ -106,6 +106,7 @@ func Save(path string, config Config) error {
 	if err := normalized.Validate(); err != nil {
 		return err
 	}
+	SortSkills(normalized.Skills)
 
 	data, err := json.MarshalIndent(normalized, "", "  ")
 	if err != nil {
@@ -128,6 +129,8 @@ type LockEntry struct {
 	Origin  string `json:"origin"`
 	Version string `json:"version"`
 	Rev     string `json:"rev"`
+	Subdir  string `json:"subdir,omitempty"`
+	Name    string `json:"name,omitempty"`
 }
 
 func LoadLock(path string) (map[LockKey]string, error) {
@@ -167,26 +170,15 @@ func LoadLock(path string) (map[LockKey]string, error) {
 }
 
 func SaveLock(path string, entries map[LockKey]string) error {
+	return SaveLockWithSkills(path, entries, nil)
+}
+
+func SaveLockWithSkills(path string, entries map[LockKey]string, skills []Skill) error {
 	if path == "" {
 		return fmt.Errorf("lock path is required")
 	}
 
-	lockEntries := make([]LockEntry, 0, len(entries))
-	for key, rev := range entries {
-		lockEntries = append(lockEntries, LockEntry{Origin: key.Origin, Version: key.Version, Rev: rev})
-	}
-
-	sort.Slice(lockEntries, func(i, j int) bool {
-		left := lockEntries[i]
-		right := lockEntries[j]
-		if left.Origin != right.Origin {
-			return left.Origin < right.Origin
-		}
-		if left.Version != right.Version {
-			return left.Version < right.Version
-		}
-		return left.Rev < right.Rev
-	})
+	lockEntries := buildLockEntries(entries, skills)
 
 	payload, err := json.MarshalIndent(lockFile{Schema: lockSchemaVersion, Entries: lockEntries}, "", "  ")
 	if err != nil {
@@ -201,6 +193,76 @@ func SaveLock(path string, entries map[LockKey]string) error {
 	}
 
 	return os.WriteFile(path, payload, 0o644)
+}
+
+type lockEntryMetadata struct {
+	Subdir string
+	Name   string
+}
+
+func buildLockEntries(entries map[LockKey]string, skills []Skill) []LockEntry {
+	lockEntries := make([]LockEntry, 0, len(entries))
+	if len(entries) == 0 {
+		return lockEntries
+	}
+
+	metadataByKey := map[LockKey][]lockEntryMetadata{}
+	seenByKey := map[LockKey]map[lockEntryMetadata]struct{}{}
+	for _, skill := range skills {
+		if skill.Version == "" {
+			continue
+		}
+		key := LockKey{Origin: skill.Origin, Version: skill.Version}
+		if _, ok := entries[key]; !ok {
+			continue
+		}
+		metadata := lockEntryMetadata{Subdir: skill.Subdir, Name: skill.Name}
+		if _, ok := seenByKey[key]; !ok {
+			seenByKey[key] = map[lockEntryMetadata]struct{}{}
+		}
+		if _, exists := seenByKey[key][metadata]; exists {
+			continue
+		}
+		seenByKey[key][metadata] = struct{}{}
+		metadataByKey[key] = append(metadataByKey[key], metadata)
+	}
+
+	for key, rev := range entries {
+		metadata := metadataByKey[key]
+		if len(metadata) == 0 {
+			lockEntries = append(lockEntries, LockEntry{Origin: key.Origin, Version: key.Version, Rev: rev})
+			continue
+		}
+		for _, item := range metadata {
+			lockEntries = append(lockEntries, LockEntry{
+				Origin:  key.Origin,
+				Version: key.Version,
+				Rev:     rev,
+				Subdir:  item.Subdir,
+				Name:    item.Name,
+			})
+		}
+	}
+
+	sort.Slice(lockEntries, func(i, j int) bool {
+		left := lockEntries[i]
+		right := lockEntries[j]
+		if left.Origin != right.Origin {
+			return left.Origin < right.Origin
+		}
+		if left.Version != right.Version {
+			return left.Version < right.Version
+		}
+		if left.Subdir != right.Subdir {
+			return left.Subdir < right.Subdir
+		}
+		if left.Name != right.Name {
+			return left.Name < right.Name
+		}
+		return left.Rev < right.Rev
+	})
+
+	return lockEntries
 }
 
 func resolveManifestPath(root string) (string, bool, error) {

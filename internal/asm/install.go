@@ -41,7 +41,7 @@ func installSkills(state manifest.State) (InstallReport, error) {
 	warnings = append(warnings, result.Warnings...)
 
 	if lockChanged {
-		if err := manifest.SaveLock(state.LockPath, state.Lock); err != nil {
+		if err := manifest.SaveLockWithSkills(state.LockPath, state.Lock, state.Config.Skills); err != nil {
 			return InstallReport{}, err
 		}
 	}

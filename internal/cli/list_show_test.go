@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -46,6 +47,49 @@ func TestLsAndShow(t *testing.T) {
 	}
 	if output.Name != "foo" {
 		t.Fatalf("expected foo, got %s", output.Name)
+	}
+}
+
+func TestLsOutputsSkillsAlphabetically(t *testing.T) {
+	repo := t.TempDir()
+	setWorkingDir(t, repo)
+
+	alpha := filepath.Join(t.TempDir(), "alpha")
+	mid := filepath.Join(t.TempDir(), "mid")
+	zeta := filepath.Join(t.TempDir(), "zeta")
+
+	payload := struct {
+		Skills []manifest.Skill `json:"skills"`
+	}{
+		Skills: []manifest.Skill{
+			{Name: "zeta", Origin: zeta},
+			{Name: "alpha", Origin: alpha},
+			{Name: "mid", Origin: mid},
+		},
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, "skills.jsonc"), data, 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+
+	cmd, stdout, _ := newTestCommand()
+	cmd.SetArgs([]string{"ls"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("ls: %v", err)
+	}
+
+	output := stdout.String()
+	alphaIndex := strings.Index(output, "alpha")
+	midIndex := strings.Index(output, "mid")
+	zetaIndex := strings.Index(output, "zeta")
+	if alphaIndex == -1 || midIndex == -1 || zetaIndex == -1 {
+		t.Fatalf("expected all skill names in output, got %q", output)
+	}
+	if !(alphaIndex < midIndex && midIndex < zetaIndex) {
+		t.Fatalf("expected alphabetical order alpha -> mid -> zeta, got %q", output)
 	}
 }
 
