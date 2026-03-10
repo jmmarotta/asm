@@ -36,6 +36,7 @@ asm install
 
 # inspect configured skills
 asm ls
+asm ls --sort origin
 asm show foo
 
 # find skills
@@ -101,7 +102,7 @@ Notes:
 - `asm remove [<name>...] [--origin origin]`
 - `asm install`
 - `asm find <query...>`
-- `asm ls`
+- `asm ls [--sort name|origin]`
 - `asm show <name>`
 
 Aliases: `add` = `a`, `find` = `f`, `install` = `i`, `remove` = `rm`/`uninstall`, `update` = `up`.

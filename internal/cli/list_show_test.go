@@ -2,7 +2,6 @@ package cli
 
 import (
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -54,25 +53,18 @@ func TestLsOutputsSkillsAlphabetically(t *testing.T) {
 	repo := t.TempDir()
 	setWorkingDir(t, repo)
 
-	alpha := filepath.Join(t.TempDir(), "alpha")
-	mid := filepath.Join(t.TempDir(), "mid")
-	zeta := filepath.Join(t.TempDir(), "zeta")
+	firstOrigin := filepath.Join(t.TempDir(), "source-1")
+	secondOrigin := filepath.Join(t.TempDir(), "source-2")
+	thirdOrigin := filepath.Join(t.TempDir(), "source-3")
 
-	payload := struct {
-		Skills []manifest.Skill `json:"skills"`
-	}{
+	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{
 		Skills: []manifest.Skill{
-			{Name: "zeta", Origin: zeta},
-			{Name: "alpha", Origin: alpha},
-			{Name: "mid", Origin: mid},
+			{Name: "skill-z", Origin: thirdOrigin},
+			{Name: "skill-a", Origin: firstOrigin},
+			{Name: "skill-m", Origin: secondOrigin},
 		},
-	}
-	data, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("marshal manifest: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(repo, "skills.jsonc"), data, 0o644); err != nil {
-		t.Fatalf("write manifest: %v", err)
+	}); err != nil {
+		t.Fatalf("save manifest: %v", err)
 	}
 
 	cmd, stdout, _ := newTestCommand()
@@ -82,14 +74,50 @@ func TestLsOutputsSkillsAlphabetically(t *testing.T) {
 	}
 
 	output := stdout.String()
-	alphaIndex := strings.Index(output, "alpha")
-	midIndex := strings.Index(output, "mid")
-	zetaIndex := strings.Index(output, "zeta")
-	if alphaIndex == -1 || midIndex == -1 || zetaIndex == -1 {
-		t.Fatalf("expected all skill names in output, got %q", output)
+	assertOutputOrder(t, output, "skill-a", "skill-m", "skill-z")
+	assertOutputOrder(t, output, firstOrigin, secondOrigin, thirdOrigin)
+}
+
+func TestLsSortsByOriginThenSkillName(t *testing.T) {
+	repo := t.TempDir()
+	setWorkingDir(t, repo)
+
+	firstOrigin := filepath.Join(t.TempDir(), "origin-a")
+	secondOrigin := filepath.Join(t.TempDir(), "origin-b")
+
+	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{
+		Skills: []manifest.Skill{
+			{Name: "skill-z", Origin: firstOrigin, Subdir: "plugins/z"},
+			{Name: "skill-a", Origin: secondOrigin},
+			{Name: "skill-m", Origin: firstOrigin, Subdir: "plugins/m"},
+		},
+	}); err != nil {
+		t.Fatalf("save manifest: %v", err)
 	}
-	if !(alphaIndex < midIndex && midIndex < zetaIndex) {
-		t.Fatalf("expected alphabetical order alpha -> mid -> zeta, got %q", output)
+
+	cmd, stdout, _ := newTestCommand()
+	cmd.SetArgs([]string{"ls", "--sort", "origin"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("ls --sort origin: %v", err)
+	}
+
+	output := stdout.String()
+	assertOutputOrder(t, output, "skill-m", "skill-z", "skill-a")
+	assertOutputOrder(t, output, firstOrigin, secondOrigin)
+}
+
+func TestLsRejectsInvalidSort(t *testing.T) {
+	repo := t.TempDir()
+	setWorkingDir(t, repo)
+
+	cmd, _, _ := newTestCommand()
+	cmd.SetArgs([]string{"ls", "--sort", "nope"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatalf("expected ls error")
+	}
+	if err.Error() != "invalid value for --sort \"nope\": expected name or origin" {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -198,5 +226,21 @@ func TestShowOmitsEmptyFields(t *testing.T) {
 	}
 	if _, ok := output["type"]; ok {
 		t.Fatalf("expected type omitted")
+	}
+}
+
+func assertOutputOrder(t *testing.T, output string, values ...string) {
+	t.Helper()
+
+	previous := -1
+	for _, value := range values {
+		index := strings.Index(output, value)
+		if index == -1 {
+			t.Fatalf("expected %q in output %q", value, output)
+		}
+		if index <= previous {
+			t.Fatalf("expected order %v in output %q", values, output)
+		}
+		previous = index
 	}
 }
