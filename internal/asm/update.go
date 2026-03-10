@@ -14,7 +14,6 @@ import (
 	"github.com/jmmarotta/agent_skills_manager/internal/debug"
 	"github.com/jmmarotta/agent_skills_manager/internal/gitstore"
 	"github.com/jmmarotta/agent_skills_manager/internal/manifest"
-	"github.com/jmmarotta/agent_skills_manager/internal/source"
 )
 
 const defaultUpdateResolveParallelism = 4
@@ -119,7 +118,7 @@ func resolveUpdateOrigins(configValue manifest.Config, selector string, pathFlag
 		}
 	}
 
-	origin, err := normalizeUpdateOrigin(selector)
+	origin, err := normalizeOriginSelector(selector)
 	if err != nil {
 		return nil, true, err
 	}
@@ -149,37 +148,6 @@ func resolveUpdateOrigins(configValue manifest.Config, selector string, pathFlag
 	return origins, true, nil
 }
 
-func normalizeUpdateOrigin(value string) (string, error) {
-	if source.IsGitHubTreeURL(value) {
-		origin, ok, err := source.GitHubTreeOrigin(value)
-		if err != nil {
-			return "", fmt.Errorf("parse github tree origin: %w", err)
-		}
-		if ok {
-			value = origin
-		}
-	}
-
-	origin, _, err := source.NormalizeFileOrigin(value)
-	if err != nil {
-		return "", err
-	}
-	if err := source.ValidateOriginScheme(origin); err != nil {
-		return "", err
-	}
-
-	if source.IsRemoteOrigin(origin) {
-		origin, _ = source.ParseOriginRef(origin)
-		return source.NormalizeOrigin(origin), nil
-	}
-
-	abs, err := filepath.Abs(origin)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Clean(abs), nil
-}
-
 func normalizeUpdateSubdir(value string) (string, error) {
 	if filepath.IsAbs(value) {
 		return "", fmt.Errorf("path must be relative: %s", value)
@@ -198,7 +166,7 @@ func normalizeUpdateSubdir(value string) (string, error) {
 
 func findSkillByIdentity(skills []manifest.Skill, origin string, subdir string) (manifest.Skill, bool) {
 	for _, skill := range skills {
-		if skill.Origin == origin && skill.Subdir == subdir {
+		if sameOrigin(skill.Origin, origin) && skill.Subdir == subdir {
 			return skill, true
 		}
 	}
@@ -207,7 +175,7 @@ func findSkillByIdentity(skills []manifest.Skill, origin string, subdir string) 
 
 func findSkillByOrigin(skills []manifest.Skill, origin string) (manifest.Skill, bool) {
 	for _, skill := range skills {
-		if skill.Origin != origin {
+		if !sameOrigin(skill.Origin, origin) {
 			continue
 		}
 		if skill.Version == "" {
