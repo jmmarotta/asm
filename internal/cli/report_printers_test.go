@@ -101,6 +101,16 @@ func TestPrintUpdateReportEmptyOrigins(t *testing.T) {
 	}
 }
 
+func TestPrintUpgradeReport(t *testing.T) {
+	var out bytes.Buffer
+
+	printUpgradeReport(asm.UpgradeReport{Target: "github.com/jmmarotta/agent_skills_manager/cmd/asm@latest"}, &out)
+
+	if out.String() != "Upgraded asm via go install github.com/jmmarotta/agent_skills_manager/cmd/asm@latest\n" {
+		t.Fatalf("unexpected output: %q", out.String())
+	}
+}
+
 func TestPrintRemoveReport(t *testing.T) {
 	var out bytes.Buffer
 	var errOut bytes.Buffer

@@ -114,6 +114,10 @@ func printUpdateReport(report asm.UpdateReport, out io.Writer, errOut io.Writer)
 	}
 }
 
+func printUpgradeReport(report asm.UpgradeReport, out io.Writer) {
+	fmt.Fprintf(out, "Upgraded asm via go install %s\n", report.Target)
+}
+
 func printRemoveReport(report asm.RemoveReport, out io.Writer, errOut io.Writer) {
 	for _, warning := range report.Warnings {
 		fmt.Fprintf(errOut, "warning: %s\n", warning)

@@ -57,6 +57,10 @@ type UpdateReport struct {
 	UpdatedOrigins []string
 }
 
+type UpgradeReport struct {
+	Target string
+}
+
 type RemoveReport struct {
 	Install      InstallReport
 	Removed      []SkillSummary
