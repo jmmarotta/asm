@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -97,6 +98,110 @@ func TestRemoveMissingSkillNoChanges(t *testing.T) {
 	}
 	if _, err := os.Lstat(linkPath); err != nil {
 		t.Fatalf("expected symlink to remain: %v", err)
+	}
+}
+
+func TestRemoveOriginRemovesAllMatchingSkills(t *testing.T) {
+	repo := t.TempDir()
+	setWorkingDir(t, repo)
+
+	originPath := filepath.Join(repo, "origin")
+	fooPath := filepath.Join(originPath, "skills", "foo")
+	barPath := filepath.Join(originPath, "skills", "bar")
+	touchSkill(t, fooPath)
+	touchSkill(t, barPath)
+
+	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{
+		Skills: []manifest.Skill{
+			{Name: "foo", Origin: originPath, Subdir: "skills/foo"},
+			{Name: "bar", Origin: originPath, Subdir: "skills/bar"},
+		},
+	}); err != nil {
+		t.Fatalf("save manifest: %v", err)
+	}
+
+	skillsDir := filepath.Join(repo, "skills")
+	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
+		t.Fatalf("mkdir skills: %v", err)
+	}
+	if err := os.Symlink(fooPath, filepath.Join(skillsDir, "foo")); err != nil {
+		t.Fatalf("symlink foo: %v", err)
+	}
+	if err := os.Symlink(barPath, filepath.Join(skillsDir, "bar")); err != nil {
+		t.Fatalf("symlink bar: %v", err)
+	}
+
+	cmd, _, _ := newTestCommand()
+	cmd.SetArgs([]string{"remove", "--origin", "origin"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+
+	loaded, err := manifest.Load(filepath.Join(repo, "skills.jsonc"))
+	if err != nil {
+		t.Fatalf("load manifest: %v", err)
+	}
+	if len(loaded.Skills) != 0 {
+		t.Fatalf("expected no skills, got %d", len(loaded.Skills))
+	}
+	if _, err := os.Lstat(filepath.Join(skillsDir, "foo")); !os.IsNotExist(err) {
+		t.Fatalf("expected foo symlink removed")
+	}
+	if _, err := os.Lstat(filepath.Join(skillsDir, "bar")); !os.IsNotExist(err) {
+		t.Fatalf("expected bar symlink removed")
+	}
+}
+
+func TestRemoveMissingOriginNoChanges(t *testing.T) {
+	repo := t.TempDir()
+	setWorkingDir(t, repo)
+
+	skillRoot := filepath.Join(t.TempDir(), "foo")
+	touchSkill(t, skillRoot)
+
+	if err := manifest.Save(filepath.Join(repo, "skills.jsonc"), manifest.Config{
+		Skills: []manifest.Skill{{
+			Name:   "foo",
+			Origin: skillRoot,
+		}},
+	}); err != nil {
+		t.Fatalf("save manifest: %v", err)
+	}
+
+	cmd, stdout, stderr := newTestCommand()
+	cmd.SetArgs([]string{"remove", "--origin", filepath.Join(repo, "missing")})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	if stdout.String() != "No matching skills removed.\n" {
+		t.Fatalf("unexpected stdout: %q", stdout.String())
+	}
+	expectedWarning := fmt.Sprintf("warning: origin %q not found\n", filepath.Join(repo, "missing"))
+	if stderr.String() != expectedWarning {
+		t.Fatalf("unexpected stderr: %q", stderr.String())
+	}
+
+	loaded, err := manifest.Load(filepath.Join(repo, "skills.jsonc"))
+	if err != nil {
+		t.Fatalf("load manifest: %v", err)
+	}
+	if len(loaded.Skills) != 1 {
+		t.Fatalf("expected skill to remain, got %d", len(loaded.Skills))
+	}
+}
+
+func TestRemoveRequiresNameOrOrigin(t *testing.T) {
+	repo := t.TempDir()
+	setWorkingDir(t, repo)
+
+	cmd, _, _ := newTestCommand()
+	cmd.SetArgs([]string{"remove"})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatalf("expected remove error")
+	}
+	if err.Error() != "requires at least one skill name or --origin" {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

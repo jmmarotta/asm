@@ -93,7 +93,7 @@ Notes:
 - `asm init [--cwd path]`
 - `asm add <path-or-url> [--path subdir]`
 - `asm update [name|origin] [--path subdir]`
-- `asm remove <name> [<name>...]`
+- `asm remove [<name>...] [--origin origin]`
 - `asm install`
 - `asm find <query...>`
 - `asm ls`
