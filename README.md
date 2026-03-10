@@ -9,6 +9,11 @@ A skill is a directory containing `SKILL.md`. Repos can expose a single skill at
 go install github.com/jmmarotta/agent_skills_manager/cmd/asm@latest
 ```
 
+After installing, upgrade to the latest release with:
+```sh
+asm upgrade
+```
+
 For reproducible installs, pin a version:
 ```sh
 go install github.com/jmmarotta/agent_skills_manager/cmd/asm@v0.1.0
