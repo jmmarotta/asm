@@ -81,7 +81,16 @@ func Add(input string, pathFlag string) (InstallReport, error) {
 		return InstallReport{}, fmt.Errorf("save manifest: %w", err)
 	}
 
-	report, err := installSkills(state)
+	prefetched := map[string]gitstore.PrefetchedOrigin{}
+	if resolution.Version != "" && resolution.RepoPath != "" && resolution.Rev != "" {
+		prefetched[resolution.Origin] = gitstore.PrefetchedOrigin{
+			Path:         resolution.RepoPath,
+			Rev:          resolution.Rev,
+			UsingReplace: resolution.ReplacePath != "",
+		}
+	}
+
+	report, err := installSkills(state, prefetched)
 	if err != nil {
 		return InstallReport{}, fmt.Errorf("install skills: %w", err)
 	}

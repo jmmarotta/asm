@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
@@ -15,6 +16,13 @@ import (
 	"github.com/jmmarotta/agent_skills_manager/internal/manifest"
 	"github.com/jmmarotta/agent_skills_manager/internal/source"
 )
+
+const defaultUpdateResolveParallelism = 4
+
+type latestOriginResult struct {
+	Resolved   gitstore.Resolved
+	Prefetched gitstore.PrefetchedOrigin
+}
 
 func Update(selector string, pathFlag string) (UpdateReport, error) {
 	state, err := manifest.LoadState()
@@ -43,33 +51,38 @@ func Update(selector string, pathFlag string) (UpdateReport, error) {
 		state.Lock = map[manifest.LockKey]string{}
 	}
 
-	for origin, versionValue := range origins {
+	resolvedOrigins, err := resolveLatestOrigins(state, updatedOrigins, origins, explicit)
+	if err != nil {
+		return UpdateReport{}, err
+	}
+
+	prefetched := map[string]gitstore.PrefetchedOrigin{}
+	for _, origin := range updatedOrigins {
+		versionValue := origins[origin]
 		if !explicit && semver.IsValid(versionValue) && !module.IsPseudoVersion(versionValue) {
 			continue
 		}
 
-		resolved, err := resolveLatestOrigin(state, origin)
-		if err != nil {
-			return UpdateReport{}, err
-		}
+		resolved := resolvedOrigins[origin]
 		debug.Logf(
 			"update origin=%s from=%s to=%s rev=%s",
 			debug.SanitizeOrigin(origin),
 			versionValue,
-			resolved.Version,
-			resolved.Rev,
+			resolved.Resolved.Version,
+			resolved.Resolved.Rev,
 		)
 
-		updateOriginVersion(state.Config.Skills, origin, resolved.Version)
+		updateOriginVersion(state.Config.Skills, origin, resolved.Resolved.Version)
 		deleteLockForOrigin(state.Lock, origin)
-		state.Lock[manifest.LockKey{Origin: origin, Version: resolved.Version}] = resolved.Rev
+		state.Lock[manifest.LockKey{Origin: origin, Version: resolved.Resolved.Version}] = resolved.Resolved.Rev
+		prefetched[origin] = resolved.Prefetched
 	}
 
 	if err := manifest.SaveState(state); err != nil {
 		return UpdateReport{}, fmt.Errorf("save manifest: %w", err)
 	}
 
-	report, err := installSkills(state)
+	report, err := installSkills(state, prefetched)
 	if err != nil {
 		return UpdateReport{}, fmt.Errorf("install skills: %w", err)
 	}
@@ -215,7 +228,71 @@ func updateOriginVersion(skills []manifest.Skill, origin string, version string)
 	}
 }
 
-func resolveLatestOrigin(state manifest.State, origin string) (gitstore.Resolved, error) {
+func resolveLatestOrigins(state manifest.State, orderedOrigins []string, versions map[string]string, explicit bool) (map[string]latestOriginResult, error) {
+	results := map[string]latestOriginResult{}
+	pending := make([]string, 0, len(orderedOrigins))
+	for _, origin := range orderedOrigins {
+		version := versions[origin]
+		if !explicit && semver.IsValid(version) && !module.IsPseudoVersion(version) {
+			continue
+		}
+		pending = append(pending, origin)
+	}
+	if len(pending) == 0 {
+		return results, nil
+	}
+
+	type item struct {
+		origin string
+		result latestOriginResult
+		err    error
+	}
+
+	maxParallel := defaultUpdateResolveParallelism
+	if maxParallel > len(pending) {
+		maxParallel = len(pending)
+	}
+	jobs := make(chan string)
+	items := make(chan item, len(pending))
+
+	var wg sync.WaitGroup
+	for range maxParallel {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for origin := range jobs {
+				resolved, prefetched, err := resolveLatestOriginPrefetched(state, origin)
+				items <- item{origin: origin, result: latestOriginResult{Resolved: resolved, Prefetched: prefetched}, err: err}
+			}
+		}()
+	}
+
+	for _, origin := range pending {
+		jobs <- origin
+	}
+	close(jobs)
+
+	go func() {
+		wg.Wait()
+		close(items)
+	}()
+
+	collected := map[string]item{}
+	for item := range items {
+		collected[item.origin] = item
+	}
+	for _, origin := range pending {
+		item := collected[origin]
+		if item.err != nil {
+			return nil, item.err
+		}
+		results[origin] = item.result
+	}
+
+	return results, nil
+}
+
+func resolveLatestOriginPrefetched(state manifest.State, origin string) (gitstore.Resolved, gitstore.PrefetchedOrigin, error) {
 	replacePath := ""
 	if state.Config.Replace != nil {
 		replacePath = state.Config.Replace[origin]
@@ -224,7 +301,7 @@ func resolveLatestOrigin(state manifest.State, origin string) (gitstore.Resolved
 		if info, err := os.Stat(replacePath); err == nil && info.IsDir() {
 			resolved, err := gitstore.ResolveForRefAt(replacePath, "")
 			if err == nil {
-				return resolved, nil
+				return resolved, gitstore.PrefetchedOrigin{Path: replacePath, Rev: resolved.Rev, UsingReplace: true}, nil
 			}
 			debug.Logf("update replace fallback origin=%s err=%v", debug.SanitizeOrigin(origin), err)
 		}
@@ -232,13 +309,13 @@ func resolveLatestOrigin(state manifest.State, origin string) (gitstore.Resolved
 
 	path := gitstore.RepoPath(state.Paths.StoreDir, origin)
 	if err := gitstore.EnsureRepo(path, origin); err != nil {
-		return gitstore.Resolved{}, err
+		return gitstore.Resolved{}, gitstore.PrefetchedOrigin{}, err
 	}
 
 	resolved, err := resolveRemoteRef(path, origin, "")
 	if err != nil {
-		return gitstore.Resolved{}, fmt.Errorf("resolve latest for %s: %w", debug.SanitizeOrigin(origin), err)
+		return gitstore.Resolved{}, gitstore.PrefetchedOrigin{}, fmt.Errorf("resolve latest for %s: %w", debug.SanitizeOrigin(origin), err)
 	}
 
-	return resolved, nil
+	return resolved, gitstore.PrefetchedOrigin{Path: path, Rev: resolved.Rev}, nil
 }

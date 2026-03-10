@@ -60,7 +60,7 @@ func Remove(names []string) (RemoveReport, error) {
 		return RemoveReport{}, err
 	}
 
-	report, err := installSkills(state)
+	report, err := installSkills(state, nil)
 	if err != nil {
 		return RemoveReport{}, fmt.Errorf("install skills: %w", err)
 	}
